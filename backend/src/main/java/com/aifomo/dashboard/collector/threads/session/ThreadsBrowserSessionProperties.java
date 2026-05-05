@@ -8,8 +8,13 @@ import java.nio.file.Path;
 public class ThreadsBrowserSessionProperties {
 
     public static final Path DEFAULT_PROFILE_DIRECTORY = Path.of("./runtime/browser-profiles/threads");
+    public static final String DEFAULT_CHROME_EXECUTABLE =
+            "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
+    public static final String DEFAULT_LOGIN_URL = "https://www.threads.net/";
 
     private Path profileDirectory = DEFAULT_PROFILE_DIRECTORY;
+    private String chromeExecutable = DEFAULT_CHROME_EXECUTABLE;
+    private String loginUrl = DEFAULT_LOGIN_URL;
 
     public Path getProfileDirectory() {
         return profileDirectory;
@@ -17,5 +22,21 @@ public class ThreadsBrowserSessionProperties {
 
     public void setProfileDirectory(Path profileDirectory) {
         this.profileDirectory = profileDirectory;
+    }
+
+    public String getChromeExecutable() {
+        return chromeExecutable;
+    }
+
+    public void setChromeExecutable(String chromeExecutable) {
+        this.chromeExecutable = chromeExecutable;
+    }
+
+    public String getLoginUrl() {
+        return loginUrl;
+    }
+
+    public void setLoginUrl(String loginUrl) {
+        this.loginUrl = loginUrl;
     }
 }

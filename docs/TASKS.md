@@ -352,7 +352,7 @@ Verification:
 
 ## Step 10. Threads Login Browser Launcher
 
-Status: OPEN
+Status: DONE
 
 Goal:
 사용자가 앱 전용 Chrome profile directory로 열린 브라우저에서 직접 Threads에 로그인할 수 있게 한다.
@@ -395,7 +395,7 @@ Verification:
 
 ## Step 11. Threads Fixture Parser
 
-Status: LOCKED
+Status: OPEN
 
 Goal:
 실제 브라우저 수집기를 붙이기 전에, Threads HTML/DOM/JSON snapshot에서 게시글 정보를 안정적으로 파싱하는 로직을 만든다.

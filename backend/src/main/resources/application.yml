@@ -23,3 +23,5 @@ app:
   threads:
     browser-session:
       profile-directory: ./runtime/browser-profiles/threads
+      chrome-executable: /Applications/Google Chrome.app/Contents/MacOS/Google Chrome
+      login-url: https://www.threads.net/
