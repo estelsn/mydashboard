@@ -227,7 +227,7 @@ Step 4 검토 전에는 구현하지 않는다.
 
 ## Step 6. CollectionRun Skeleton
 
-Status: OPEN
+Status: DONE
 
 Step 5 검토 전에는 구현하지 않는다.
 
@@ -239,7 +239,7 @@ Step 5 검토 전에는 구현하지 않는다.
 
 ## Step 7. Threads Collector Design Only
 
-Status: LOCKED
+Status: OPEN
 
 Step 6 검토 전에는 구현하지 않는다.
 
