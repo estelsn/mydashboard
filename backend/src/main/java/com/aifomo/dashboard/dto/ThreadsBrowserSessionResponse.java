@@ -5,7 +5,7 @@ import com.aifomo.dashboard.collector.threads.session.BrowserSessionStatus;
 
 public record ThreadsBrowserSessionResponse(
         BrowserSessionStatus status,
-        String profileDirectory,
+        String profilePath,
         String message
 ) {
 

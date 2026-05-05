@@ -307,7 +307,7 @@ Verification:
 
 ## Step 9. Threads Session Status API
 
-Status: OPEN
+Status: DONE
 
 Goal:
 프론트엔드와 수집 실행 흐름에서 Threads 로그인 세션 준비 상태를 확인할 수 있는 API를 만든다.
@@ -352,7 +352,7 @@ Verification:
 
 ## Step 10. Threads Login Browser Launcher
 
-Status: LOCKED
+Status: OPEN
 
 Goal:
 사용자가 앱 전용 Chrome profile directory로 열린 브라우저에서 직접 Threads에 로그인할 수 있게 한다.

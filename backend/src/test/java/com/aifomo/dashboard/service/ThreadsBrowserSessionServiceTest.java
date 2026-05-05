@@ -24,7 +24,7 @@ class ThreadsBrowserSessionServiceTest {
         ThreadsBrowserSessionResponse response = new ThreadsBrowserSessionService(provider).getSessionStatus();
 
         assertThat(response.status()).isEqualTo(BrowserSessionStatus.LOGIN_REQUIRED);
-        assertThat(response.profileDirectory()).isEqualTo("./runtime/browser-profiles/threads");
+        assertThat(response.profilePath()).isEqualTo("./runtime/browser-profiles/threads");
         assertThat(response.message()).contains("profile directory");
     }
 }
