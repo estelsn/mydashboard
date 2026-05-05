@@ -1,0 +1,8 @@
+plugins {
+    id 'java'
+}
+
+allprojects {
+    group = 'com.aifomo'
+    version = '0.0.1-SNAPSHOT'
+}
