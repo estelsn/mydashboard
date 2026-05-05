@@ -27,6 +27,7 @@ public class InfoItemService {
 
     private final InfoItemRepository infoItemRepository;
     private final EvaluationRepository evaluationRepository;
+    private final EvaluationService evaluationService;
 
     @Transactional(readOnly = true)
     public List<InfoItemResponse> findAll(boolean includeHidden) {
@@ -50,7 +51,8 @@ public class InfoItemService {
         infoItem.setDecisionStatus(decisionStatus);
         infoItem.setManualOverride(true);
         infoItem.setHidden(DEFAULT_HIDDEN_STATUSES.contains(decisionStatus));
-        return toResponse(infoItem);
+        Evaluation evaluation = evaluationService.createManualEvaluation(infoItem, decisionStatus);
+        return InfoItemResponse.from(infoItem, EvaluationResponse.from(evaluation));
     }
 
     @Transactional
@@ -59,7 +61,8 @@ public class InfoItemService {
         infoItem.setDecisionStatus(DecisionStatus.ARCHIVE_CANDIDATE);
         infoItem.setHidden(true);
         infoItem.setManualOverride(true);
-        return toResponse(infoItem);
+        Evaluation evaluation = evaluationService.createManualEvaluation(infoItem, DecisionStatus.ARCHIVE_CANDIDATE);
+        return InfoItemResponse.from(infoItem, EvaluationResponse.from(evaluation));
     }
 
     @Transactional
@@ -70,7 +73,8 @@ public class InfoItemService {
             infoItem.setDecisionStatus(DecisionStatus.UNREVIEWED);
         }
         infoItem.setManualOverride(true);
-        return toResponse(infoItem);
+        Evaluation evaluation = evaluationService.createManualEvaluation(infoItem, infoItem.getDecisionStatus());
+        return InfoItemResponse.from(infoItem, EvaluationResponse.from(evaluation));
     }
 
     @Transactional(readOnly = true)

@@ -2,7 +2,7 @@ package com.aifomo.dashboard.domain.evaluation;
 
 public enum EvaluatorType {
     SEED_SAMPLE,
-    RULE_BASED,
     MANUAL,
-    LLM
+    RULE_BASED_STUB,
+    LLM_READY_STUB
 }

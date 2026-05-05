@@ -787,7 +787,7 @@ Verification:
 
 ## Step 20. Evaluation Pipeline
 
-Status: OPEN
+Status: DONE
 
 Goal:
 수집된 정보를 평가하는 파이프라인을 정리하고, 향후 LLM 평가 연동이 가능한 구조를 만든다.
@@ -822,7 +822,7 @@ Verification:
 
 ## Step 21. Dashboard Polish
 
-Status: LOCKED
+Status: OPEN
 
 Goal:
 현재까지 구현된 백엔드/프론트엔드 기능을 실제 사용할 수 있는 로컬 대시보드 형태로 정리한다.

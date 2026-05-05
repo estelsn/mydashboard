@@ -93,7 +93,8 @@ class BackendApiTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.decisionStatus").value("APPLY"))
                 .andExpect(jsonPath("$.manualOverride").value(true))
-                .andExpect(jsonPath("$.hidden").value(false));
+                .andExpect(jsonPath("$.hidden").value(false))
+                .andExpect(jsonPath("$.latestEvaluation.evaluatorType").value("MANUAL"));
 
         InfoItem updated = infoItemRepository.findById(infoItem.getId()).orElseThrow();
         assertThat(updated.getDecisionStatus()).isEqualTo(DecisionStatus.APPLY);
