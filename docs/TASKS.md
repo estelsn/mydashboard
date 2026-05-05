@@ -637,7 +637,7 @@ Verification:
 
 ## Step 16. Frontend Manual Threads Collection Trigger
 
-Status: OPEN
+Status: DONE
 
 Goal:
 프론트엔드에서 Threads 수집을 수동 실행하고 결과를 확인할 수 있게 한다.
@@ -671,7 +671,7 @@ Verification:
 
 ## Step 17. Source Model
 
-Status: LOCKED
+Status: OPEN
 
 Goal:
 Threads 계정, 공식 블로그, RSS 피드를 공통 Source 개념으로 관리할 수 있는 모델을 추가한다.

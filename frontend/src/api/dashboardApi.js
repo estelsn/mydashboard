@@ -49,3 +49,18 @@ export function openThreadsLoginBrowser() {
     method: 'POST',
   });
 }
+
+export function fetchCollectionRuns() {
+  return requestJson('/api/collection-runs');
+}
+
+export function collectThreads({ accountUrls, maxPostsPerAccount, maxScrollCount }) {
+  return requestJson('/api/collection-runs/threads', {
+    method: 'POST',
+    body: JSON.stringify({
+      accountUrls,
+      maxPostsPerAccount,
+      maxScrollCount,
+    }),
+  });
+}

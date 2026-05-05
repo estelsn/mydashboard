@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   archiveInfoItem,
   fetchDashboardSummary,
@@ -13,6 +13,7 @@ import {
   groupItemsByDashboardSection,
   isHiddenDashboardItem,
 } from './dashboardSections';
+import { ThreadsCollectionPanel } from './ThreadsCollectionPanel';
 import { ThreadsSessionPanel } from './ThreadsSessionPanel';
 
 const summaryCards = [
@@ -51,12 +52,12 @@ function App() {
   const [error, setError] = useState('');
   const [pendingItemId, setPendingItemId] = useState(null);
 
-  useEffect(() => {
-    let ignore = false;
-
-    async function loadDashboard() {
-      setLoading(true);
-      setError('');
+  const loadDashboard = useCallback(
+    async ({ ignore } = {}) => {
+      if (!ignore?.()) {
+        setLoading(true);
+        setError('');
+      }
 
       try {
         const [nextSummary, nextItems] = await Promise.all([
@@ -64,26 +65,48 @@ function App() {
           fetchInfoItems({ includeHidden }),
         ]);
 
-        if (!ignore) {
+        if (!ignore?.()) {
           setSummary(nextSummary);
           setItems(nextItems);
         }
       } catch (nextError) {
-        if (!ignore) {
+        if (!ignore?.()) {
           setError(nextError.message);
         }
       } finally {
-        if (!ignore) {
+        if (!ignore?.()) {
           setLoading(false);
         }
       }
-    }
+    },
+    [includeHidden],
+  );
 
-    loadDashboard();
+  useEffect(() => {
+    let ignore = false;
+
+    loadDashboard({
+      ignore: () => ignore,
+    });
 
     return () => {
       ignore = true;
     };
+  }, [loadDashboard]);
+
+  const refreshDashboard = useCallback(async () => {
+    setError('');
+
+    try {
+      const [nextSummary, nextItems] = await Promise.all([
+        fetchDashboardSummary(),
+        fetchInfoItems({ includeHidden }),
+      ]);
+      setSummary(nextSummary);
+      setItems(nextItems);
+    } catch (nextError) {
+      setError(nextError.message);
+    }
   }, [includeHidden]);
 
   const groups = useMemo(
@@ -143,6 +166,8 @@ function App() {
         </section>
 
         <ThreadsSessionPanel />
+
+        <ThreadsCollectionPanel onDashboardRefresh={refreshDashboard} />
 
         {error ? (
           <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">

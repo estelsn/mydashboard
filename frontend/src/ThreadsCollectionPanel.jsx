@@ -1,0 +1,216 @@
+import { useEffect, useState } from 'react';
+import { collectThreads, fetchCollectionRuns } from './api/dashboardApi';
+
+const runStatusLabels = {
+  RUNNING: '실행 중',
+  SUCCEEDED: '성공',
+  FAILED: '실패',
+  PARTIAL_SUCCESS: '부분 성공',
+};
+
+const runStatusStyles = {
+  RUNNING: 'border-sky-200 bg-sky-50 text-sky-800',
+  SUCCEEDED: 'border-teal-200 bg-teal-50 text-teal-800',
+  FAILED: 'border-red-200 bg-red-50 text-red-800',
+  PARTIAL_SUCCESS: 'border-amber-200 bg-amber-50 text-amber-800',
+};
+
+export function ThreadsCollectionPanel({ onDashboardRefresh }) {
+  const [accountUrl, setAccountUrl] = useState('');
+  const [maxPostsPerAccount, setMaxPostsPerAccount] = useState(20);
+  const [maxScrollCount, setMaxScrollCount] = useState(5);
+  const [runs, setRuns] = useState([]);
+  const [loadingRuns, setLoadingRuns] = useState(true);
+  const [collecting, setCollecting] = useState(false);
+  const [result, setResult] = useState(null);
+  const [error, setError] = useState('');
+
+  async function refreshRuns() {
+    setLoadingRuns(true);
+
+    try {
+      const nextRuns = await fetchCollectionRuns();
+      setRuns(nextRuns);
+    } finally {
+      setLoadingRuns(false);
+    }
+  }
+
+  async function handleCollect(event) {
+    event.preventDefault();
+
+    const trimmedUrl = accountUrl.trim();
+    if (!trimmedUrl) {
+      setError('수집 대상 Threads 계정 URL을 입력하세요.');
+      setResult(null);
+      return;
+    }
+
+    setCollecting(true);
+    setError('');
+    setResult(null);
+
+    try {
+      const response = await collectThreads({
+        accountUrls: [trimmedUrl],
+        maxPostsPerAccount: Number(maxPostsPerAccount),
+        maxScrollCount: Number(maxScrollCount),
+      });
+
+      setResult(response);
+      await Promise.all([refreshRuns(), onDashboardRefresh?.()]);
+    } catch (nextError) {
+      setError(nextError.message);
+    } finally {
+      setCollecting(false);
+    }
+  }
+
+  useEffect(() => {
+    let ignore = false;
+
+    async function loadRuns() {
+      setLoadingRuns(true);
+      setError('');
+
+      try {
+        const nextRuns = await fetchCollectionRuns();
+
+        if (!ignore) {
+          setRuns(nextRuns);
+        }
+      } catch (nextError) {
+        if (!ignore) {
+          setError(nextError.message);
+        }
+      } finally {
+        if (!ignore) {
+          setLoadingRuns(false);
+        }
+      }
+    }
+
+    loadRuns();
+
+    return () => {
+      ignore = true;
+    };
+  }, []);
+
+  return (
+    <section className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(320px,420px)]">
+        <form className="flex flex-col gap-4" onSubmit={handleCollect}>
+          <div>
+            <h2 className="text-base font-semibold text-slate-950">Threads 수동 수집</h2>
+          </div>
+
+          <label className="flex flex-col gap-1.5 text-sm font-medium text-slate-700">
+            계정 URL
+            <input
+              className="rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-950 shadow-sm outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
+              type="url"
+              value={accountUrl}
+              placeholder="https://www.threads.com/@example"
+              onChange={(event) => setAccountUrl(event.target.value)}
+            />
+          </label>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="flex flex-col gap-1.5 text-sm font-medium text-slate-700">
+              계정당 최대 게시물
+              <input
+                className="rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-950 shadow-sm outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
+                type="number"
+                min="1"
+                max="100"
+                value={maxPostsPerAccount}
+                onChange={(event) => setMaxPostsPerAccount(event.target.value)}
+              />
+            </label>
+            <label className="flex flex-col gap-1.5 text-sm font-medium text-slate-700">
+              최대 스크롤
+              <input
+                className="rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-950 shadow-sm outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
+                type="number"
+                min="0"
+                max="50"
+                value={maxScrollCount}
+                onChange={(event) => setMaxScrollCount(event.target.value)}
+              />
+            </label>
+          </div>
+
+          <button
+            className="w-fit rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-50"
+            type="submit"
+            disabled={collecting}
+          >
+            {collecting ? '수집 실행 중' : '수집 실행'}
+          </button>
+        </form>
+
+        <div>
+          <h3 className="text-sm font-semibold text-slate-950">최근 수집 실행</h3>
+          <div className="mt-3 flex flex-col gap-2">
+            {loadingRuns ? (
+              <p className="rounded-md border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-500">
+                수집 실행 목록 불러오는 중
+              </p>
+            ) : null}
+
+            {!loadingRuns && runs.length === 0 ? (
+              <p className="rounded-md border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-500">
+                수집 실행 기록 없음
+              </p>
+            ) : null}
+
+            {!loadingRuns &&
+              runs.map((run) => (
+                <CollectionRunRow key={run.id} run={run} />
+              ))}
+          </div>
+        </div>
+      </div>
+
+      {result ? (
+        <div className="mt-4 rounded-md border border-teal-200 bg-teal-50 px-3 py-3 text-sm text-teal-900">
+          실행 결과: 수집 {result.collectedCount}, 생성 {result.createdCount}, 중복{' '}
+          {result.duplicateCount}, 실패 {result.failedCount}
+          {result.failureReason ? (
+            <p className="mt-2 text-red-800">실패 사유: {result.failureReason}</p>
+          ) : null}
+        </div>
+      ) : null}
+
+      {error ? (
+        <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+          Threads 수집 API를 호출하지 못했습니다. {error}
+        </p>
+      ) : null}
+    </section>
+  );
+}
+
+function CollectionRunRow({ run }) {
+  const statusLabel = runStatusLabels[run.status] ?? run.status;
+  const statusClassName = runStatusStyles[run.status] ?? runStatusStyles.FAILED;
+
+  return (
+    <article className="rounded-md border border-slate-200 px-3 py-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${statusClassName}`}>
+          {statusLabel}
+        </span>
+        <span className="text-xs text-slate-500">Run #{run.id}</span>
+      </div>
+      <p className="mt-2 text-sm text-slate-700">
+        수집 {run.collectedItemCount}, 생성 {run.createdCount}, 중복 {run.duplicateCount}, 실패{' '}
+        {run.failedCount}
+      </p>
+      {run.failureReason ? (
+        <p className="mt-2 text-sm text-red-700">실패 사유: {run.failureReason}</p>
+      ) : null}
+    </article>
+  );
+}
