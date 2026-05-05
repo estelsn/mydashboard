@@ -7,7 +7,18 @@ async function requestJson(path, options = {}) {
   });
 
   if (!response.ok) {
-    throw new Error(`API request failed: ${response.status}`);
+    const method = options.method ?? 'GET';
+    let detail = '';
+
+    try {
+      const payload = await response.json();
+      detail = payload.detail ?? payload.message ?? payload.title ?? '';
+    } catch {
+      detail = '';
+    }
+
+    const suffix = detail ? ` - ${detail}` : '';
+    throw new Error(`${method} ${path} failed with HTTP ${response.status}${suffix}`);
   }
 
   return response.json();

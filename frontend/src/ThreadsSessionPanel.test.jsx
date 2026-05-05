@@ -94,13 +94,72 @@ describe('ThreadsSessionPanel', () => {
     expect(fetchThreadsSessionStatus).toHaveBeenCalledTimes(2);
   });
 
+  it('treats login required after opening Chrome as guidance, not an error', async () => {
+    fetchThreadsSessionStatus
+      .mockResolvedValueOnce({
+        status: 'LOGIN_REQUIRED',
+        profilePath: null,
+        message: 'login needed',
+      })
+      .mockResolvedValueOnce({
+        status: 'LOGIN_REQUIRED',
+        profilePath: '/tmp/threads-profile',
+        message: 'still needs login',
+      });
+    openThreadsLoginBrowser.mockResolvedValue({
+      status: 'OPENED',
+      profilePath: '/tmp/threads-profile',
+      loginUrl: 'https://www.threads.net/',
+      message: 'browser opened',
+    });
+
+    render(<ThreadsSessionPanel />);
+
+    await screen.findByText('login needed');
+    fireEvent.click(screen.getByRole('button', { name: '로그인 브라우저 열기' }));
+
+    expect(
+      await screen.findByText('Chrome을 열었습니다. 열린 Chrome에서 로그인 후 다시 확인하세요.'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/실패했습니다/)).not.toBeInTheDocument();
+    expect(screen.getByTestId('threads-session-status')).toHaveTextContent('로그인 필요');
+  });
+
+  it('separates status refresh errors after opening the login browser', async () => {
+    fetchThreadsSessionStatus
+      .mockResolvedValueOnce({
+        status: 'LOGIN_REQUIRED',
+        profilePath: null,
+        message: 'login needed',
+      })
+      .mockRejectedValueOnce(new Error('GET /api/threads/session failed with HTTP 500'));
+    openThreadsLoginBrowser.mockResolvedValue({
+      status: 'OPENED',
+      profilePath: '/tmp/threads-profile',
+      loginUrl: 'https://www.threads.net/',
+      message: 'browser opened',
+    });
+
+    render(<ThreadsSessionPanel />);
+
+    await screen.findByText('login needed');
+    fireEvent.click(screen.getByRole('button', { name: '로그인 브라우저 열기' }));
+
+    expect(await screen.findByText('browser opened')).toBeInTheDocument();
+    expect(
+      await screen.findByText(
+        'Threads 세션 상태를 확인하지 못했습니다. GET /api/threads/session failed with HTTP 500',
+      ),
+    ).toBeInTheDocument();
+  });
+
   it('shows an error message when the status API fails', async () => {
     fetchThreadsSessionStatus.mockRejectedValue(new Error('network failed'));
 
     render(<ThreadsSessionPanel />);
 
     expect(
-      await screen.findByText('Threads 세션 API를 호출하지 못했습니다. network failed'),
+      await screen.findByText('Threads 세션 상태를 확인하지 못했습니다. network failed'),
     ).toBeInTheDocument();
   });
 
@@ -119,7 +178,7 @@ describe('ThreadsSessionPanel', () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText('Threads 세션 API를 호출하지 못했습니다. chrome missing'),
+        screen.getByText('로그인 브라우저 열기 요청이 실패했습니다. chrome missing'),
       ).toBeInTheDocument();
     });
   });

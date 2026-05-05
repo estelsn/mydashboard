@@ -17,7 +17,9 @@ import java.util.Comparator;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.doThrow;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -70,7 +72,7 @@ class ThreadsSessionApiTest {
     @Test
     void opensThreadsLoginBrowserWithoutSensitiveData() throws Exception {
         mockMvc.perform(post("/api/threads/session/open-login"))
-                .andExpect(status().isOk())
+                .andExpect(status().isAccepted())
                 .andExpect(jsonPath("$.status").value("OPENED"))
                 .andExpect(jsonPath("$.profilePath").value("build/test-runtime/threads-session-api/missing-profile"))
                 .andExpect(jsonPath("$.loginUrl").value("https://www.threads.net/"))
@@ -79,6 +81,15 @@ class ThreadsSessionApiTest {
                 .andExpect(jsonPath("$.cookies").doesNotExist())
                 .andExpect(jsonPath("$.tokens").doesNotExist())
                 .andExpect(jsonPath("$.password").doesNotExist());
+    }
+
+    @Test
+    void allowsLocalFrontendCorsPreflightForOpenLogin() throws Exception {
+        mockMvc.perform(options("/api/threads/session/open-login")
+                        .header("Origin", "http://localhost:5173")
+                        .header("Access-Control-Request-Method", "POST"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Access-Control-Allow-Origin", "http://localhost:5173"));
     }
 
     @Test

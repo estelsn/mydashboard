@@ -4,6 +4,8 @@ import com.aifomo.dashboard.dto.ThreadsBrowserSessionResponse;
 import com.aifomo.dashboard.dto.ThreadsLoginBrowserResponse;
 import com.aifomo.dashboard.service.ThreadsBrowserSessionService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -22,7 +24,8 @@ public class ThreadsSessionController {
     }
 
     @PostMapping("/open-login")
-    public ThreadsLoginBrowserResponse openLoginBrowser() {
-        return threadsBrowserSessionService.openLoginBrowser();
+    public ResponseEntity<ThreadsLoginBrowserResponse> openLoginBrowser() {
+        return ResponseEntity.status(HttpStatus.ACCEPTED)
+                .body(threadsBrowserSessionService.openLoginBrowser());
     }
 }

@@ -22,18 +22,19 @@ export function ThreadsSessionPanel() {
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
   const [opening, setOpening] = useState(false);
-  const [error, setError] = useState('');
+  const [statusError, setStatusError] = useState('');
+  const [openLoginError, setOpenLoginError] = useState('');
   const [actionMessage, setActionMessage] = useState('');
 
   async function refreshSessionStatus() {
     setLoading(true);
-    setError('');
+    setStatusError('');
 
     try {
       const nextSession = await fetchThreadsSessionStatus();
       setSession(nextSession);
     } catch (nextError) {
-      setError(nextError.message);
+      setStatusError(nextError.message);
     } finally {
       setLoading(false);
     }
@@ -41,15 +42,26 @@ export function ThreadsSessionPanel() {
 
   async function handleOpenLoginBrowser() {
     setOpening(true);
-    setError('');
+    setStatusError('');
+    setOpenLoginError('');
     setActionMessage('');
 
     try {
       const response = await openThreadsLoginBrowser();
-      setActionMessage(response.message ?? '로그인 브라우저를 열었습니다.');
-      await refreshSessionStatus();
+      setActionMessage(response.message ?? 'Chrome을 열었습니다. 열린 Chrome에서 로그인 후 다시 확인하세요.');
+
+      try {
+        const nextSession = await fetchThreadsSessionStatus();
+        setSession(nextSession);
+
+        if (nextSession.status === 'LOGIN_REQUIRED') {
+          setActionMessage('Chrome을 열었습니다. 열린 Chrome에서 로그인 후 다시 확인하세요.');
+        }
+      } catch (nextError) {
+        setStatusError(nextError.message);
+      }
     } catch (nextError) {
-      setError(nextError.message);
+      setOpenLoginError(nextError.message);
     } finally {
       setOpening(false);
     }
@@ -60,7 +72,7 @@ export function ThreadsSessionPanel() {
 
     async function loadSessionStatus() {
       setLoading(true);
-      setError('');
+      setStatusError('');
 
       try {
         const nextSession = await fetchThreadsSessionStatus();
@@ -70,7 +82,7 @@ export function ThreadsSessionPanel() {
         }
       } catch (nextError) {
         if (!ignore) {
-          setError(nextError.message);
+          setStatusError(nextError.message);
         }
       } finally {
         if (!ignore) {
@@ -135,9 +147,15 @@ export function ThreadsSessionPanel() {
         </StateMessage>
       ) : null}
 
-      {error ? (
+      {openLoginError ? (
         <StateMessage tone="error" className="mt-3">
-          Threads 세션 API를 호출하지 못했습니다. {error}
+          로그인 브라우저 열기 요청이 실패했습니다. {openLoginError}
+        </StateMessage>
+      ) : null}
+
+      {statusError ? (
+        <StateMessage tone="error" className="mt-3">
+          Threads 세션 상태를 확인하지 못했습니다. {statusError}
         </StateMessage>
       ) : null}
     </section>
