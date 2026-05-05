@@ -2,6 +2,7 @@ package com.aifomo.dashboard.collector.threads;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.stereotype.Component;
 import org.springframework.web.util.HtmlUtils;
 
 import java.util.ArrayList;
@@ -15,6 +16,7 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+@Component
 public class ThreadsPostParser {
 
     private static final Pattern THREADS_POST_ARTICLE = Pattern.compile(

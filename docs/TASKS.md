@@ -435,7 +435,7 @@ Verification:
 
 ## Step 12. Threads Browser Collector
 
-Status: OPEN
+Status: DONE
 
 Goal:
 앱 전용 Chrome profile directory를 재사용해 로그인된 Threads 페이지에서 게시글 원문 데이터를 가져오는 수집기를 구현한다.
@@ -486,7 +486,7 @@ Verification:
 
 ## Step 13. Threads Collection Persistence
 
-Status: LOCKED
+Status: OPEN
 
 Goal:
 Threads 수집 결과를 CollectedItem, InfoItem, CollectionRun 흐름에 연결해 DB에 저장한다.
