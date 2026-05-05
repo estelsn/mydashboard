@@ -64,3 +64,14 @@ export function collectThreads({ accountUrls, maxPostsPerAccount, maxScrollCount
     }),
   });
 }
+
+export function fetchSources() {
+  return requestJson('/api/sources');
+}
+
+export function updateSourceEnabled(id, enabled) {
+  return requestJson(`/api/sources/${id}/enabled`, {
+    method: 'PATCH',
+    body: JSON.stringify({ enabled }),
+  });
+}

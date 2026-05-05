@@ -716,7 +716,7 @@ Verification:
 
 ## Step 18. Source Management UI
 
-Status: OPEN
+Status: DONE
 
 Goal:
 프론트엔드에서 수집 대상 Source 목록을 확인하고 기본 상태를 관리할 수 있게 한다.
@@ -753,7 +753,7 @@ Verification:
 
 ## Step 19. RSS / Official Source Collector
 
-Status: LOCKED
+Status: OPEN
 
 Goal:
 공식 블로그와 RSS 피드 기반 수집 흐름을 추가한다.

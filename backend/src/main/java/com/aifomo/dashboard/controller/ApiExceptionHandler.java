@@ -3,6 +3,7 @@ package com.aifomo.dashboard.controller;
 import com.aifomo.dashboard.collector.threads.session.ThreadsLoginBrowserLaunchException;
 import com.aifomo.dashboard.service.DuplicateCollectionRunException;
 import com.aifomo.dashboard.service.InfoItemNotFoundException;
+import com.aifomo.dashboard.service.SourceNotFoundException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -16,6 +17,14 @@ public class ApiExceptionHandler {
     ProblemDetail handleInfoItemNotFound(InfoItemNotFoundException exception) {
         ProblemDetail problemDetail = ProblemDetail.forStatus(HttpStatus.NOT_FOUND);
         problemDetail.setTitle("InfoItem not found");
+        problemDetail.setDetail(exception.getMessage());
+        return problemDetail;
+    }
+
+    @ExceptionHandler(SourceNotFoundException.class)
+    ProblemDetail handleSourceNotFound(SourceNotFoundException exception) {
+        ProblemDetail problemDetail = ProblemDetail.forStatus(HttpStatus.NOT_FOUND);
+        problemDetail.setTitle("Source not found");
         problemDetail.setDetail(exception.getMessage());
         return problemDetail;
     }

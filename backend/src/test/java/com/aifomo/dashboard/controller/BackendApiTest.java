@@ -2,7 +2,9 @@ package com.aifomo.dashboard.controller;
 
 import com.aifomo.dashboard.domain.info.DecisionStatus;
 import com.aifomo.dashboard.domain.info.InfoItem;
+import com.aifomo.dashboard.domain.source.Source;
 import com.aifomo.dashboard.repository.InfoItemRepository;
+import com.aifomo.dashboard.repository.SourceRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -33,6 +35,9 @@ class BackendApiTest {
     @Autowired
     private InfoItemRepository infoItemRepository;
 
+    @Autowired
+    private SourceRepository sourceRepository;
+
     @Test
     void exposesSourceList() throws Exception {
         mockMvc.perform(get("/api/sources"))
@@ -43,6 +48,21 @@ class BackendApiTest {
                 .andExpect(jsonPath("$[0].enabled").value(true))
                 .andExpect(jsonPath("$[0].priority").value(10))
                 .andExpect(jsonPath("$[12].sourceType").value("RSS_FEED"));
+    }
+
+    @Test
+    void updatesSourceEnabledState() throws Exception {
+        Source source = sourceRepository.findAllByOrderByPriorityAscIdAsc().getFirst();
+
+        mockMvc.perform(patch("/api/sources/{id}/enabled", source.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"enabled\":false}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(source.getId()))
+                .andExpect(jsonPath("$.enabled").value(false));
+
+        Source updated = sourceRepository.findById(source.getId()).orElseThrow();
+        assertThat(updated.isEnabled()).isFalse();
     }
 
     @Test

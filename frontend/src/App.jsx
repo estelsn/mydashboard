@@ -15,6 +15,7 @@ import {
 } from './dashboardSections';
 import { ThreadsCollectionPanel } from './ThreadsCollectionPanel';
 import { ThreadsSessionPanel } from './ThreadsSessionPanel';
+import { SourceManagementPanel } from './SourceManagementPanel';
 
 const summaryCards = [
   { key: 'visibleCount', label: '기본 노출' },
@@ -168,6 +169,8 @@ function App() {
         <ThreadsSessionPanel />
 
         <ThreadsCollectionPanel onDashboardRefresh={refreshDashboard} />
+
+        <SourceManagementPanel />
 
         {error ? (
           <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
