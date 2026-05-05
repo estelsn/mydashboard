@@ -532,7 +532,7 @@ Verification:
 
 ## Step 14. Manual Threads Collection API
 
-Status: OPEN
+Status: DONE
 
 Goal:
 사용자가 수동으로 Threads 계정 수집을 실행할 수 있는 API를 만든다.
@@ -599,7 +599,7 @@ Verification:
 
 ## Step 15. Frontend Threads Session Panel
 
-Status: LOCKED
+Status: OPEN
 
 Goal:
 프론트엔드에서 Threads 로그인 세션 상태를 확인하고, 로그인 브라우저를 열 수 있게 한다.

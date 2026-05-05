@@ -1,18 +1,30 @@
 package com.aifomo.dashboard.controller;
 
+import com.aifomo.dashboard.collector.threads.ThreadsCollectedPost;
+import com.aifomo.dashboard.collector.threads.ThreadsCollectionResult;
+import com.aifomo.dashboard.collector.threads.ThreadsCollectionStatus;
+import com.aifomo.dashboard.collector.threads.ThreadsCollector;
 import com.aifomo.dashboard.domain.collection.CollectionRun;
 import com.aifomo.dashboard.domain.collection.CollectionRunStatus;
 import com.aifomo.dashboard.repository.CollectionRunRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 import static org.hamcrest.Matchers.hasSize;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -28,6 +40,14 @@ class CollectionRunApiTest {
 
     @Autowired
     private CollectionRunRepository collectionRunRepository;
+
+    @MockBean
+    private ThreadsCollector threadsCollector;
+
+    @BeforeEach
+    void setUp() {
+        collectionRunRepository.deleteAll();
+    }
 
     @Test
     void exposesRecentCollectionRunsForStatusDisplay() throws Exception {
@@ -52,5 +72,92 @@ class CollectionRunApiTest {
                 .andExpect(jsonPath("$[0].failedSourceCount").value(1))
                 .andExpect(jsonPath("$[0].collectedItemCount").value(42))
                 .andExpect(jsonPath("$[0].statusMessage").value("Completed with one source failure"));
+    }
+
+    @Test
+    void runsManualThreadsCollectionAndReturnsCounts() throws Exception {
+        when(threadsCollector.collect(any())).thenAnswer(invocation -> {
+            var request = invocation.getArgument(0, com.aifomo.dashboard.collector.threads.ThreadsCollectionRequest.class);
+            return new ThreadsCollectionResult(request.source(), List.of(new ThreadsCollectedPost(
+                    "https://www.threads.net/@example/post/1",
+                    "New Threads AI update",
+                    LocalDateTime.of(2026, 5, 5, 12, 0)
+            )), List.of());
+        });
+
+        mockMvc.perform(post("/api/collection-runs/threads")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "accountUrls": ["https://www.threads.net/@example"],
+                                  "maxPostsPerAccount": 20,
+                                  "maxScrollCount": 5
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.runId").isNumber())
+                .andExpect(jsonPath("$.status").value("SUCCEEDED"))
+                .andExpect(jsonPath("$.collectedCount").value(1))
+                .andExpect(jsonPath("$.createdCount").value(1))
+                .andExpect(jsonPath("$.duplicateCount").value(0))
+                .andExpect(jsonPath("$.failedCount").value(0))
+                .andExpect(jsonPath("$.failureReason").doesNotExist());
+    }
+
+    @Test
+    void rejectsManualThreadsCollectionWhenRunIsAlreadyRunning() throws Exception {
+        collectionRunRepository.save(new CollectionRun(
+                CollectionRunStatus.RUNNING,
+                1,
+                0,
+                0,
+                0,
+                LocalDateTime.of(2026, 5, 5, 12, 0),
+                null,
+                "Running"
+        ));
+
+        mockMvc.perform(post("/api/collection-runs/threads")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "accountUrls": ["https://www.threads.net/@example"],
+                                  "maxPostsPerAccount": 20,
+                                  "maxScrollCount": 5
+                                }
+                                """))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.title").value("Collection run already running"));
+
+        verifyNoInteractions(threadsCollector);
+    }
+
+    @Test
+    void recordsFailureReasonWhenManualThreadsCollectionFails() throws Exception {
+        when(threadsCollector.collect(any())).thenAnswer(invocation -> {
+            var request = invocation.getArgument(0, com.aifomo.dashboard.collector.threads.ThreadsCollectionRequest.class);
+            return ThreadsCollectionResult.failure(
+                    request.source(),
+                    ThreadsCollectionStatus.LOGIN_REQUIRED,
+                    "Threads login required"
+            );
+        });
+
+        mockMvc.perform(post("/api/collection-runs/threads")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "accountUrls": ["https://www.threads.net/@example"],
+                                  "maxPostsPerAccount": 20,
+                                  "maxScrollCount": 5
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("FAILED"))
+                .andExpect(jsonPath("$.collectedCount").value(0))
+                .andExpect(jsonPath("$.createdCount").value(0))
+                .andExpect(jsonPath("$.duplicateCount").value(0))
+                .andExpect(jsonPath("$.failedCount").value(0))
+                .andExpect(jsonPath("$.failureReason").value(org.hamcrest.Matchers.containsString("Threads login required")));
     }
 }

@@ -46,7 +46,7 @@ class ThreadsBrowserCollectorTest {
                 properties
         );
 
-        var result = collector.collect(new ThreadsCollectionRequest(source(), 10));
+        var result = collector.collect(new ThreadsCollectionRequest(source(), 10, 4));
 
         assertThat(result.status()).isEqualTo(ThreadsCollectionStatus.SUCCESS);
         assertThat(result.posts()).hasSize(1);
@@ -56,7 +56,7 @@ class ThreadsBrowserCollectorTest {
         assertThat(pageClient.request.url()).isEqualTo("https://www.threads.com/@choi.openai");
         assertThat(pageClient.request.profileDirectory()).isEqualTo(tempDir);
         assertThat(pageClient.request.headless()).isTrue();
-        assertThat(pageClient.request.maxScrollCount()).isEqualTo(2);
+        assertThat(pageClient.request.maxScrollCount()).isEqualTo(4);
     }
 
     @Test

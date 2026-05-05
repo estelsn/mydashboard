@@ -67,7 +67,7 @@ public class ThreadsBrowserCollector implements ThreadsCollector {
                 request.source().getUrl(),
                 session.profileDirectory(),
                 properties.isHeadless(),
-                normalizedMaxScrollCount(),
+                normalizedMaxScrollCount(request),
                 properties.getTimeout()
         ));
         if (snapshot.status() != ThreadsBrowserPageStatus.SUCCESS) {
@@ -118,7 +118,10 @@ public class ThreadsBrowserCollector implements ThreadsCollector {
         return Math.min(request.maxItems(), configuredLimit);
     }
 
-    private int normalizedMaxScrollCount() {
+    private int normalizedMaxScrollCount(ThreadsCollectionRequest request) {
+        if (request.maxScrollCount() > 0) {
+            return request.maxScrollCount();
+        }
         return Math.max(0, properties.getMaxScrollCount());
     }
 

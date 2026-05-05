@@ -22,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 
 @Service
@@ -69,37 +70,74 @@ public class ThreadsCollectionPersistenceService {
                 null,
                 "Threads collection persistence started"
         ));
+        return persist(run, List.of(result));
+    }
 
-        if (result.status() != ThreadsCollectionStatus.SUCCESS && result.status() != ThreadsCollectionStatus.EMPTY_RESULT) {
-            String failureReason = statusMessage(result);
-            run.complete(
-                    CollectionRunStatus.FAILED,
-                    0,
-                    1,
-                    result.posts().size(),
-                    0,
-                    0,
-                    result.posts().size(),
-                    LocalDateTime.now(clock),
-                    failureReason,
-                    failureReason
-            );
-            return run;
+    @Transactional
+    public CollectionRun persist(CollectionRun run, Collection<ThreadsCollectionResult> results) {
+        int successfulSourceCount = 0;
+        int failedSourceCount = 0;
+        int collectedItemCount = 0;
+        int createdCount = 0;
+        int duplicateCount = 0;
+        int failedCount = 0;
+        List<String> failures = new ArrayList<>();
+        List<String> messages = new ArrayList<>();
+
+        for (ThreadsCollectionResult result : results) {
+            collectedItemCount += result.posts().size();
+
+            if (result.status() != ThreadsCollectionStatus.SUCCESS && result.status() != ThreadsCollectionStatus.EMPTY_RESULT) {
+                failedSourceCount++;
+                failedCount += result.posts().size();
+                String failureReason = statusMessage(result);
+                failures.add(failureReason);
+                messages.add(failureReason);
+                continue;
+            }
+
+            PersistCounts counts = persistPosts(result.source(), result.posts());
+            createdCount += counts.createdCount();
+            duplicateCount += counts.duplicateCount();
+            failedCount += counts.failedCount();
+            if (counts.failedCount() > 0) {
+                failedSourceCount++;
+                failures.addAll(counts.failures());
+            } else {
+                successfulSourceCount++;
+            }
+            messages.add(statusMessage(result, counts));
         }
 
-        PersistCounts counts = persistPosts(result.source(), result.posts());
-        boolean failed = counts.failedCount() > 0;
-        String failureReason = failed ? String.join("; ", counts.failures()) : null;
+        boolean failed = failedSourceCount > 0 || failedCount > 0;
+        String failureReason = failed ? String.join("; ", failures) : null;
         run.complete(
                 failed ? CollectionRunStatus.FAILED : CollectionRunStatus.SUCCEEDED,
-                failed ? 0 : 1,
-                failed ? 1 : 0,
-                result.posts().size(),
-                counts.createdCount(),
-                counts.duplicateCount(),
-                counts.failedCount(),
+                successfulSourceCount,
+                failedSourceCount,
+                collectedItemCount,
+                createdCount,
+                duplicateCount,
+                failedCount,
                 LocalDateTime.now(clock),
-                statusMessage(result, counts),
+                String.join("; ", messages),
+                failureReason
+        );
+        return run;
+    }
+
+    @Transactional
+    public CollectionRun fail(CollectionRun run, String failureReason) {
+        run.complete(
+                CollectionRunStatus.FAILED,
+                0,
+                run.getTotalSourceCount(),
+                0,
+                0,
+                0,
+                0,
+                LocalDateTime.now(clock),
+                failureReason,
                 failureReason
         );
         return run;

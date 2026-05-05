@@ -1,6 +1,7 @@
 package com.aifomo.dashboard.controller;
 
 import com.aifomo.dashboard.collector.threads.session.ThreadsLoginBrowserLaunchException;
+import com.aifomo.dashboard.service.DuplicateCollectionRunException;
 import com.aifomo.dashboard.service.InfoItemNotFoundException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
@@ -31,6 +32,14 @@ public class ApiExceptionHandler {
     ProblemDetail handleThreadsLoginBrowserLaunchError(ThreadsLoginBrowserLaunchException exception) {
         ProblemDetail problemDetail = ProblemDetail.forStatus(HttpStatus.INTERNAL_SERVER_ERROR);
         problemDetail.setTitle("Threads login browser launch failed");
+        problemDetail.setDetail(exception.getMessage());
+        return problemDetail;
+    }
+
+    @ExceptionHandler(DuplicateCollectionRunException.class)
+    ProblemDetail handleDuplicateCollectionRun(DuplicateCollectionRunException exception) {
+        ProblemDetail problemDetail = ProblemDetail.forStatus(HttpStatus.CONFLICT);
+        problemDetail.setTitle("Collection run already running");
         problemDetail.setDetail(exception.getMessage());
         return problemDetail;
     }

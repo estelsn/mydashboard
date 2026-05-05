@@ -9,8 +9,13 @@ import java.util.Objects;
 
 public record ThreadsCollectionRequest(
         Source source,
-        int maxItems
+        int maxItems,
+        int maxScrollCount
 ) {
+
+    public ThreadsCollectionRequest(Source source, int maxItems) {
+        this(source, maxItems, 0);
+    }
 
     public ThreadsCollectionRequest {
         Objects.requireNonNull(source, "source must not be null");
@@ -22,6 +27,9 @@ public record ThreadsCollectionRequest(
         }
         if (maxItems < 1) {
             throw new IllegalArgumentException("maxItems must be greater than zero");
+        }
+        if (maxScrollCount < 0) {
+            throw new IllegalArgumentException("maxScrollCount must not be negative");
         }
     }
 
@@ -37,7 +45,10 @@ public record ThreadsCollectionRequest(
             String path = uri.getPath();
 
             return "https".equalsIgnoreCase(scheme)
-                    && ("www.threads.com".equalsIgnoreCase(host) || "threads.com".equalsIgnoreCase(host))
+                    && ("www.threads.com".equalsIgnoreCase(host)
+                    || "threads.com".equalsIgnoreCase(host)
+                    || "www.threads.net".equalsIgnoreCase(host)
+                    || "threads.net".equalsIgnoreCase(host))
                     && path != null
                     && path.matches("/@[^/]+/?");
         } catch (URISyntaxException ex) {

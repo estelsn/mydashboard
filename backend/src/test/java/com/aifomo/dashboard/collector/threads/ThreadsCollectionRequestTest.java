@@ -20,15 +20,16 @@ class ThreadsCollectionRequestTest {
                 "Choi OpenAI",
                 SourceType.THREADS,
                 SourceCategory.NEWS,
-                "https://www.threads.com/@choi.openai",
+                "https://www.threads.net/@choi.openai",
                 "Threads AI news curation",
                 true
         );
 
-        ThreadsCollectionRequest request = new ThreadsCollectionRequest(source, 10);
+        ThreadsCollectionRequest request = new ThreadsCollectionRequest(source, 10, 5);
 
         assertThat(request.source()).isSameAs(source);
         assertThat(request.maxItems()).isEqualTo(10);
+        assertThat(request.maxScrollCount()).isEqualTo(5);
     }
 
     @Test
@@ -77,6 +78,22 @@ class ThreadsCollectionRequestTest {
         assertThatThrownBy(() -> new ThreadsCollectionRequest(source, 0))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("maxItems must be greater than zero");
+    }
+
+    @Test
+    void rejectsNegativeMaxScrollCount() {
+        Source source = new Source(
+                "Choi OpenAI",
+                SourceType.THREADS,
+                SourceCategory.NEWS,
+                "https://threads.com/@choi.openai",
+                "Threads AI news curation",
+                true
+        );
+
+        assertThatThrownBy(() -> new ThreadsCollectionRequest(source, 10, -1))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("maxScrollCount must not be negative");
     }
 
     @Test

@@ -1,9 +1,15 @@
 package com.aifomo.dashboard.controller;
 
 import com.aifomo.dashboard.dto.CollectionRunResponse;
+import com.aifomo.dashboard.dto.ManualThreadsCollectionRequest;
+import com.aifomo.dashboard.dto.ManualThreadsCollectionResponse;
 import com.aifomo.dashboard.service.CollectionRunQueryService;
+import com.aifomo.dashboard.service.ManualThreadsCollectionService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -15,9 +21,15 @@ import java.util.List;
 public class CollectionRunController {
 
     private final CollectionRunQueryService collectionRunQueryService;
+    private final ManualThreadsCollectionService manualThreadsCollectionService;
 
     @GetMapping
     public List<CollectionRunResponse> findRecentRuns() {
         return collectionRunQueryService.findRecentRuns();
+    }
+
+    @PostMapping("/threads")
+    public ManualThreadsCollectionResponse collectThreads(@Valid @RequestBody ManualThreadsCollectionRequest request) {
+        return manualThreadsCollectionService.collect(request);
     }
 }
