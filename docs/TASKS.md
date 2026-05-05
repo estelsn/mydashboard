@@ -156,7 +156,7 @@ Official/Future sources:
 
 ## Step 2. Backend API
 
-Status: OPEN
+Status: DONE
 
 Step 1 검토 전에는 구현하지 않는다.
 
@@ -180,7 +180,7 @@ Step 1 검토 전에는 구현하지 않는다.
 
 ## Step 3. RuleBasedEvaluator
 
-Status: LOCKED
+Status: OPEN
 
 Step 2 검토 전에는 구현하지 않는다.
 

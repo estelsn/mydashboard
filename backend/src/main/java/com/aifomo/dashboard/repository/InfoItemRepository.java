@@ -17,6 +17,8 @@ public interface InfoItemRepository extends JpaRepository<InfoItem, Long> {
 
     List<InfoItem> findByIsDeletedFalseAndIsHiddenFalseAndDecisionStatusNotInOrderByCollectedAtDesc(Collection<DecisionStatus> decisionStatuses);
 
+    List<InfoItem> findByIsDeletedFalseAndManualOverrideFalseAndDecisionStatusOrderByCollectedAtDesc(DecisionStatus decisionStatus);
+
     long countByIsDeletedFalseAndDecisionStatus(DecisionStatus decisionStatus);
 
     long countByIsDeletedFalseAndIsHiddenFalseAndDecisionStatus(DecisionStatus decisionStatus);
