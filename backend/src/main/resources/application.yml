@@ -18,3 +18,8 @@ spring:
     properties:
       hibernate:
         format_sql: true
+
+app:
+  threads:
+    browser-session:
+      profile-directory: ./runtime/browser-profiles/threads

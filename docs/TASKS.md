@@ -252,7 +252,7 @@ Step 6 검토 전에는 구현하지 않는다.
 
 ## Step 8. Threads Browser Session Strategy
 
-Status: OPEN
+Status: DONE
 
 Goal:
 Threads 수집에 사용할 로그인 세션 전략을 확정하고, 앱 전용 브라우저 프로필 기반 구조를 준비한다.
@@ -307,7 +307,7 @@ Verification:
 
 ## Step 9. Threads Session Status API
 
-Status: LOCKED
+Status: OPEN
 
 Goal:
 프론트엔드와 수집 실행 흐름에서 Threads 로그인 세션 준비 상태를 확인할 수 있는 API를 만든다.
