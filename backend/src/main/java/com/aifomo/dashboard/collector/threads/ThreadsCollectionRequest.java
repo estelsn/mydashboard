@@ -19,8 +19,8 @@ public record ThreadsCollectionRequest(
 
     public ThreadsCollectionRequest {
         Objects.requireNonNull(source, "source must not be null");
-        if (source.getSourceType() != SourceType.THREADS) {
-            throw new IllegalArgumentException("sourceType must be THREADS");
+        if (source.getSourceType() != SourceType.THREADS_ACCOUNT) {
+            throw new IllegalArgumentException("sourceType must be THREADS_ACCOUNT");
         }
         if (!isSupportedThreadsProfileUrl(source.getUrl())) {
             throw new IllegalArgumentException("source url must be a Threads profile URL");

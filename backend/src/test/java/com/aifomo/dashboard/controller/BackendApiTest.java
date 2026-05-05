@@ -37,9 +37,12 @@ class BackendApiTest {
     void exposesSourceList() throws Exception {
         mockMvc.perform(get("/api/sources"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(12)))
+                .andExpect(jsonPath("$", hasSize(13)))
                 .andExpect(jsonPath("$[0].id").exists())
-                .andExpect(jsonPath("$[0].sourceType").exists());
+                .andExpect(jsonPath("$[0].sourceType").value("THREADS_ACCOUNT"))
+                .andExpect(jsonPath("$[0].enabled").value(true))
+                .andExpect(jsonPath("$[0].priority").value(10))
+                .andExpect(jsonPath("$[12].sourceType").value("RSS_FEED"));
     }
 
     @Test

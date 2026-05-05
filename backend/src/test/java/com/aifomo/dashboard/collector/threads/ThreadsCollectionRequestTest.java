@@ -18,7 +18,7 @@ class ThreadsCollectionRequestTest {
     void acceptsThreadsProfileSource() {
         Source source = new Source(
                 "Choi OpenAI",
-                SourceType.THREADS,
+                SourceType.THREADS_ACCOUNT,
                 SourceCategory.NEWS,
                 "https://www.threads.net/@choi.openai",
                 "Threads AI news curation",
@@ -45,14 +45,14 @@ class ThreadsCollectionRequestTest {
 
         assertThatThrownBy(() -> new ThreadsCollectionRequest(source, 10))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("sourceType must be THREADS");
+                .hasMessage("sourceType must be THREADS_ACCOUNT");
     }
 
     @Test
     void rejectsInvalidThreadsProfileUrl() {
         Source source = new Source(
                 "Threads Post",
-                SourceType.THREADS,
+                SourceType.THREADS_ACCOUNT,
                 SourceCategory.NEWS,
                 "https://www.threads.com/@choi.openai/post/abc",
                 "Post URL",
@@ -68,7 +68,7 @@ class ThreadsCollectionRequestTest {
     void rejectsNonPositiveMaxItems() {
         Source source = new Source(
                 "Choi OpenAI",
-                SourceType.THREADS,
+                SourceType.THREADS_ACCOUNT,
                 SourceCategory.NEWS,
                 "https://threads.com/@choi.openai",
                 "Threads AI news curation",
@@ -84,7 +84,7 @@ class ThreadsCollectionRequestTest {
     void rejectsNegativeMaxScrollCount() {
         Source source = new Source(
                 "Choi OpenAI",
-                SourceType.THREADS,
+                SourceType.THREADS_ACCOUNT,
                 SourceCategory.NEWS,
                 "https://threads.com/@choi.openai",
                 "Threads AI news curation",
@@ -100,7 +100,7 @@ class ThreadsCollectionRequestTest {
     void protectsResultListsFromExternalMutation() {
         Source source = new Source(
                 "Choi OpenAI",
-                SourceType.THREADS,
+                SourceType.THREADS_ACCOUNT,
                 SourceCategory.NEWS,
                 "https://www.threads.com/@choi.openai",
                 "Threads AI news curation",

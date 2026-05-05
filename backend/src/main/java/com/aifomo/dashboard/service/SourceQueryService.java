@@ -16,7 +16,7 @@ public class SourceQueryService {
     private final SourceRepository sourceRepository;
 
     public List<SourceResponse> findAll() {
-        return sourceRepository.findAll().stream()
+        return sourceRepository.findAllByOrderByPriorityAscIdAsc().stream()
                 .map(SourceResponse::from)
                 .toList();
     }

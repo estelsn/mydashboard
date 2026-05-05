@@ -132,7 +132,7 @@ class ThreadsBrowserCollectorTest {
     private static Source source() {
         return new Source(
                 "Choi OpenAI",
-                SourceType.THREADS,
+                SourceType.THREADS_ACCOUNT,
                 SourceCategory.NEWS,
                 "https://www.threads.com/@choi.openai",
                 "Threads AI news curation",

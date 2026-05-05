@@ -59,7 +59,7 @@ class ThreadsCollectionPersistenceServiceTest {
         );
         source = sourceRepository.save(new Source(
                 "Choi OpenAI",
-                SourceType.THREADS,
+                SourceType.THREADS_ACCOUNT,
                 SourceCategory.NEWS,
                 "https://www.threads.com/@choi.openai",
                 "Threads AI news curation",

@@ -13,7 +13,8 @@ public record SourceResponse(
         SourceCategory category,
         String url,
         String description,
-        boolean active,
+        boolean enabled,
+        int priority,
         LocalDateTime lastCollectedAt,
         LocalDateTime createdAt,
         LocalDateTime updatedAt
@@ -26,7 +27,8 @@ public record SourceResponse(
                 source.getCategory(),
                 source.getUrl(),
                 source.getDescription(),
-                source.isActive(),
+                source.isEnabled(),
+                source.getPriority(),
                 source.getLastCollectedAt(),
                 source.getCreatedAt(),
                 source.getUpdatedAt()

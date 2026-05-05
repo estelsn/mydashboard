@@ -671,7 +671,7 @@ Verification:
 
 ## Step 17. Source Model
 
-Status: OPEN
+Status: DONE
 
 Goal:
 Threads 계정, 공식 블로그, RSS 피드를 공통 Source 개념으로 관리할 수 있는 모델을 추가한다.
@@ -716,7 +716,7 @@ Verification:
 
 ## Step 18. Source Management UI
 
-Status: LOCKED
+Status: OPEN
 
 Goal:
 프론트엔드에서 수집 대상 Source 목록을 확인하고 기본 상태를 관리할 수 있게 한다.

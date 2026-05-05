@@ -44,7 +44,10 @@ public class Source {
     private String description;
 
     @Column(nullable = false)
-    private boolean isActive;
+    private boolean enabled;
+
+    @Column(nullable = false)
+    private int priority;
 
     private LocalDateTime lastCollectedAt;
 
@@ -54,13 +57,26 @@ public class Source {
     @Column(nullable = false)
     private LocalDateTime updatedAt;
 
-    public Source(String name, SourceType sourceType, SourceCategory category, String url, String description, boolean isActive) {
+    public Source(String name, SourceType sourceType, String url, boolean enabled, int priority) {
+        this(name, sourceType, SourceCategory.ETC, url, null, enabled, priority);
+    }
+
+    public Source(String name, SourceType sourceType, SourceCategory category, String url, String description, boolean enabled) {
+        this(name, sourceType, category, url, description, enabled, 100);
+    }
+
+    public Source(String name, SourceType sourceType, SourceCategory category, String url, String description, boolean enabled, int priority) {
         this.name = name;
         this.sourceType = sourceType;
         this.category = category;
         this.url = url;
         this.description = description;
-        this.isActive = isActive;
+        this.enabled = enabled;
+        this.priority = priority;
+    }
+
+    public boolean isActive() {
+        return enabled;
     }
 
     @PrePersist

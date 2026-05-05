@@ -74,11 +74,12 @@ public class ManualThreadsCollectionService {
         String normalizedUrl = normalizeUrl(accountUrl);
         Source candidate = new Source(
                 sourceName(normalizedUrl),
-                SourceType.THREADS,
+                SourceType.THREADS_ACCOUNT,
                 SourceCategory.NEWS,
                 normalizedUrl,
                 "Manual Threads collection source",
-                true
+                true,
+                100
         );
         new ThreadsCollectionRequest(candidate, 1);
         return sourceRepository.findByUrl(normalizedUrl)
