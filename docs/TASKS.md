@@ -822,7 +822,7 @@ Verification:
 
 ## Step 21. Dashboard Polish
 
-Status: OPEN
+Status: DONE
 
 Goal:
 현재까지 구현된 백엔드/프론트엔드 기능을 실제 사용할 수 있는 로컬 대시보드 형태로 정리한다.
@@ -854,7 +854,7 @@ Verification:
 
 ## Step 22. Final Verification and Documentation
 
-Status: LOCKED
+Status: OPEN
 
 Goal:
 완성본 기준으로 전체 검증을 수행하고, 현재 구현 범위와 제외 범위를 문서화한다.

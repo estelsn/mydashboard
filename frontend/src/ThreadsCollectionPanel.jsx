@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { collectThreads, fetchCollectionRuns } from './api/dashboardApi';
+import { StateMessage, StatusBadge, formatDateTime } from './ui';
 
 const runStatusLabels = {
   RUNNING: '실행 중',
@@ -8,11 +9,11 @@ const runStatusLabels = {
   PARTIAL_SUCCESS: '부분 성공',
 };
 
-const runStatusStyles = {
-  RUNNING: 'border-sky-200 bg-sky-50 text-sky-800',
-  SUCCEEDED: 'border-teal-200 bg-teal-50 text-teal-800',
-  FAILED: 'border-red-200 bg-red-50 text-red-800',
-  PARTIAL_SUCCESS: 'border-amber-200 bg-amber-50 text-amber-800',
+const runStatusTones = {
+  RUNNING: 'sky',
+  SUCCEEDED: 'teal',
+  FAILED: 'red',
+  PARTIAL_SUCCESS: 'amber',
 };
 
 export function ThreadsCollectionPanel({ onDashboardRefresh }) {
@@ -154,15 +155,15 @@ export function ThreadsCollectionPanel({ onDashboardRefresh }) {
           <h3 className="text-sm font-semibold text-slate-950">최근 수집 실행</h3>
           <div className="mt-3 flex flex-col gap-2">
             {loadingRuns ? (
-              <p className="rounded-md border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-500">
+              <StateMessage tone="loading">
                 수집 실행 목록 불러오는 중
-              </p>
+              </StateMessage>
             ) : null}
 
             {!loadingRuns && runs.length === 0 ? (
-              <p className="rounded-md border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-500">
+              <StateMessage tone="empty">
                 수집 실행 기록 없음
-              </p>
+              </StateMessage>
             ) : null}
 
             {!loadingRuns &&
@@ -174,19 +175,19 @@ export function ThreadsCollectionPanel({ onDashboardRefresh }) {
       </div>
 
       {result ? (
-        <div className="mt-4 rounded-md border border-teal-200 bg-teal-50 px-3 py-3 text-sm text-teal-900">
+        <StateMessage tone={result.failedCount > 0 ? 'warning' : 'success'} className="mt-4">
           실행 결과: 수집 {result.collectedCount}, 생성 {result.createdCount}, 중복{' '}
           {result.duplicateCount}, 실패 {result.failedCount}
           {result.failureReason ? (
-            <p className="mt-2 text-red-800">실패 사유: {result.failureReason}</p>
+            <span className="mt-2 block text-red-800">실패 사유: {result.failureReason}</span>
           ) : null}
-        </div>
+        </StateMessage>
       ) : null}
 
       {error ? (
-        <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+        <StateMessage tone="error" className="mt-4">
           Threads 수집 API를 호출하지 못했습니다. {error}
-        </p>
+        </StateMessage>
       ) : null}
     </section>
   );
@@ -194,22 +195,25 @@ export function ThreadsCollectionPanel({ onDashboardRefresh }) {
 
 function CollectionRunRow({ run }) {
   const statusLabel = runStatusLabels[run.status] ?? run.status;
-  const statusClassName = runStatusStyles[run.status] ?? runStatusStyles.FAILED;
+  const statusTone = runStatusTones[run.status] ?? runStatusTones.FAILED;
 
   return (
     <article className="rounded-md border border-slate-200 px-3 py-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${statusClassName}`}>
-          {statusLabel}
-        </span>
+        <StatusBadge tone={statusTone}>{statusLabel}</StatusBadge>
         <span className="text-xs text-slate-500">Run #{run.id}</span>
       </div>
       <p className="mt-2 text-sm text-slate-700">
         수집 {run.collectedItemCount}, 생성 {run.createdCount}, 중복 {run.duplicateCount}, 실패{' '}
         {run.failedCount}
       </p>
+      <p className="mt-1 text-xs text-slate-500">
+        생성 {formatDateTime(run.createdAt)} · 갱신 {formatDateTime(run.updatedAt)}
+      </p>
       {run.failureReason ? (
-        <p className="mt-2 text-sm text-red-700">실패 사유: {run.failureReason}</p>
+        <p className="mt-2 rounded-md border border-red-100 bg-red-50 px-2.5 py-2 text-sm text-red-700">
+          실패 사유: {run.failureReason}
+        </p>
       ) : null}
     </article>
   );

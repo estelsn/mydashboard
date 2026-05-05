@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { fetchThreadsSessionStatus, openThreadsLoginBrowser } from './api/dashboardApi';
+import { StateMessage, StatusBadge } from './ui';
 
 const sessionStatusLabels = {
   NOT_CONFIGURED: '설정 필요',
@@ -9,12 +10,12 @@ const sessionStatusLabels = {
   ERROR: '오류',
 };
 
-const sessionStatusStyles = {
-  NOT_CONFIGURED: 'border-slate-200 bg-slate-100 text-slate-700',
-  LOGIN_REQUIRED: 'border-amber-200 bg-amber-50 text-amber-800',
-  READY: 'border-teal-200 bg-teal-50 text-teal-800',
-  EXPIRED: 'border-orange-200 bg-orange-50 text-orange-800',
-  ERROR: 'border-red-200 bg-red-50 text-red-800',
+const sessionStatusTones = {
+  NOT_CONFIGURED: 'slate',
+  LOGIN_REQUIRED: 'amber',
+  READY: 'teal',
+  EXPIRED: 'orange',
+  ERROR: 'red',
 };
 
 export function ThreadsSessionPanel() {
@@ -87,7 +88,7 @@ export function ThreadsSessionPanel() {
 
   const status = session?.status ?? 'LOGIN_REQUIRED';
   const statusLabel = sessionStatusLabels[status] ?? status;
-  const statusClassName = sessionStatusStyles[status] ?? sessionStatusStyles.ERROR;
+  const statusTone = sessionStatusTones[status] ?? sessionStatusTones.ERROR;
   const busy = loading || opening;
 
   return (
@@ -96,12 +97,9 @@ export function ThreadsSessionPanel() {
         <div>
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-base font-semibold text-slate-950">Threads 세션</h2>
-            <span
-              className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${statusClassName}`}
-              data-testid="threads-session-status"
-            >
+            <StatusBadge tone={statusTone} testId="threads-session-status">
               {loading && !session ? '확인 중' : statusLabel}
-            </span>
+            </StatusBadge>
           </div>
           <p className="mt-2 text-sm leading-6 text-slate-600">
             {session?.message ?? 'Threads 로그인 세션 상태를 확인합니다.'}
@@ -132,15 +130,15 @@ export function ThreadsSessionPanel() {
       </div>
 
       {actionMessage ? (
-        <p className="mt-3 rounded-md border border-teal-200 bg-teal-50 px-3 py-2 text-sm text-teal-800">
+        <StateMessage tone="success" className="mt-3">
           {actionMessage}
-        </p>
+        </StateMessage>
       ) : null}
 
       {error ? (
-        <p className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+        <StateMessage tone="error" className="mt-3">
           Threads 세션 API를 호출하지 못했습니다. {error}
-        </p>
+        </StateMessage>
       ) : null}
     </section>
   );

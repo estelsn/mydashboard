@@ -1,22 +1,12 @@
 import { useEffect, useState } from 'react';
 import { fetchSources, updateSourceEnabled } from './api/dashboardApi';
+import { StateMessage, StatusBadge, formatDateTime } from './ui';
 
 const sourceTypeLabels = {
   THREADS_ACCOUNT: 'Threads',
   RSS_FEED: 'RSS',
   OFFICIAL_SITE: '공식 사이트',
 };
-
-function formatDateTime(value) {
-  if (!value) {
-    return '-';
-  }
-
-  return new Intl.DateTimeFormat('ko-KR', {
-    dateStyle: 'short',
-    timeStyle: 'short',
-  }).format(new Date(value));
-}
 
 export function SourceManagementPanel() {
   const [sources, setSources] = useState([]);
@@ -81,15 +71,15 @@ export function SourceManagementPanel() {
       </div>
 
       {loading ? (
-        <p className="mt-4 rounded-md border border-slate-200 bg-slate-50 px-3 py-4 text-sm text-slate-500">
+        <StateMessage tone="loading" className="mt-4">
           Source 목록 불러오는 중
-        </p>
+        </StateMessage>
       ) : null}
 
       {!loading && sources.length === 0 ? (
-        <p className="mt-4 rounded-md border border-slate-200 bg-slate-50 px-3 py-4 text-sm text-slate-500">
+        <StateMessage tone="empty" className="mt-4">
           등록된 Source 없음
-        </p>
+        </StateMessage>
       ) : null}
 
       {!loading && sources.length > 0 ? (
@@ -120,9 +110,9 @@ export function SourceManagementPanel() {
       ) : null}
 
       {error ? (
-        <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+        <StateMessage tone="error" className="mt-4">
           Source API를 호출하지 못했습니다. {error}
-        </p>
+        </StateMessage>
       ) : null}
     </section>
   );
@@ -157,13 +147,9 @@ function SourceRow({ source, pending, onEnabledChange }) {
             aria-label={`${source.name} enabled`}
             onChange={(event) => onEnabledChange(source, event.target.checked)}
           />
-          <span
-            className={`rounded-full px-2.5 py-1 ${
-              source.enabled ? 'bg-teal-50 text-teal-800' : 'bg-slate-100 text-slate-600'
-            }`}
-          >
+          <StatusBadge tone={source.enabled ? 'teal' : 'slate'}>
             {pending ? '저장 중' : enabledLabel}
-          </span>
+          </StatusBadge>
         </label>
       </td>
       <td className="px-3 py-3 align-top text-slate-700">{source.priority}</td>

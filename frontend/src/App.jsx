@@ -16,6 +16,7 @@ import {
 import { ThreadsCollectionPanel } from './ThreadsCollectionPanel';
 import { ThreadsSessionPanel } from './ThreadsSessionPanel';
 import { SourceManagementPanel } from './SourceManagementPanel';
+import { StateMessage, StatusBadge, formatDateTime, formatScore } from './ui';
 
 const summaryCards = [
   { key: 'visibleCount', label: '기본 노출' },
@@ -33,10 +34,24 @@ const decisionLabels = {
   ARCHIVE_CANDIDATE: '아카이브 후보',
 };
 
+const decisionTones = {
+  APPLY: 'teal',
+  HOLD: 'amber',
+  UNREVIEWED: 'slate',
+  IGNORE: 'red',
+  ARCHIVE_CANDIDATE: 'orange',
+};
+
 const importanceLabels = {
   HIGH: '높음',
   MEDIUM: '중간',
   LOW: '낮음',
+};
+
+const importanceTones = {
+  HIGH: 'red',
+  MEDIUM: 'amber',
+  LOW: 'slate',
 };
 
 const decisionActions = [
@@ -173,9 +188,9 @@ function App() {
         <SourceManagementPanel />
 
         {error ? (
-          <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+          <StateMessage tone="error">
             백엔드 API를 불러오지 못했습니다. {error}
-          </div>
+          </StateMessage>
         ) : null}
 
         <div className="grid gap-5 xl:grid-cols-3">
@@ -199,7 +214,9 @@ function SummaryCard({ label, value, loading }) {
   return (
     <article className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
       <p className="text-sm font-medium text-slate-500">{label}</p>
-      <p className="mt-2 text-3xl font-semibold text-slate-950">{loading ? '-' : value}</p>
+      <p className="mt-2 text-3xl font-semibold text-slate-950" aria-busy={loading}>
+        {loading ? '-' : value}
+      </p>
     </article>
   );
 }
@@ -209,22 +226,20 @@ function DashboardSection({ section, items, loading, pendingItemId, onUpdateItem
     <section className="flex min-h-80 flex-col rounded-md border border-slate-200 bg-white shadow-sm">
       <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
         <h2 className="text-base font-semibold text-slate-950">{section.title}</h2>
-        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
-          {items.length}
-        </span>
+        <StatusBadge>{items.length}</StatusBadge>
       </div>
 
       <div className="flex flex-1 flex-col gap-3 p-3">
         {loading ? (
-          <p className="rounded-md border border-slate-200 bg-slate-50 px-3 py-4 text-sm text-slate-500">
+          <StateMessage tone="loading">
             불러오는 중
-          </p>
+          </StateMessage>
         ) : null}
 
         {!loading && items.length === 0 ? (
-          <p className="rounded-md border border-slate-200 bg-slate-50 px-3 py-4 text-sm text-slate-500">
+          <StateMessage tone="empty">
             {section.emptyText}
-          </p>
+          </StateMessage>
         ) : null}
 
         {!loading &&
@@ -248,19 +263,19 @@ function InfoItemCard({ item, pending, onUpdateItem }) {
   return (
     <article className="rounded-md border border-slate-200 bg-white p-4">
       <div className="flex flex-wrap items-center gap-2 text-xs font-semibold">
-        <span className="rounded-full bg-teal-50 px-2.5 py-1 text-teal-800">
+        <StatusBadge tone={decisionTones[item.decisionStatus]}>
           {decisionLabels[item.decisionStatus] ?? item.decisionStatus}
-        </span>
-        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-700">
+        </StatusBadge>
+        <StatusBadge>
           {item.category}
-        </span>
-        <span className="rounded-full bg-amber-50 px-2.5 py-1 text-amber-800">
+        </StatusBadge>
+        <StatusBadge tone={importanceTones[item.importanceLevel]}>
           중요도 {importanceLabels[item.importanceLevel] ?? item.importanceLevel}
-        </span>
+        </StatusBadge>
         {item.manualOverride ? (
-          <span className="rounded-full bg-indigo-50 px-2.5 py-1 text-indigo-800">
+          <StatusBadge tone="indigo">
             수동 반영
-          </span>
+          </StatusBadge>
         ) : null}
       </div>
 
@@ -278,8 +293,14 @@ function InfoItemCard({ item, pending, onUpdateItem }) {
             <EvaluationMetric label="확신" value={latestEvaluation.confidence} />
           </div>
           {latestEvaluation.reason ? (
-            <p className="mt-3 line-clamp-3 text-sm leading-5 text-slate-700">
+            <p className="mt-3 line-clamp-3 border-t border-slate-200 pt-3 text-sm leading-5 text-slate-700">
+              <span className="font-semibold text-slate-900">평가 이유: </span>
               {latestEvaluation.reason}
+            </p>
+          ) : null}
+          {latestEvaluation.createdAt ? (
+            <p className="mt-2 text-xs text-slate-500">
+              평가 시각 {formatDateTime(latestEvaluation.createdAt)}
             </p>
           ) : null}
         </div>
@@ -318,7 +339,12 @@ function InfoItemCard({ item, pending, onUpdateItem }) {
       </div>
 
       <div className="mt-4 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
-        <span>{item.sourceName}</span>
+        <div className="flex flex-col gap-1">
+          <span>{item.sourceName}</span>
+          <span>
+            게시 {formatDateTime(item.publishedAt)} · 수집 {formatDateTime(item.collectedAt)}
+          </span>
+        </div>
         <a
           className="font-medium text-teal-700 hover:text-teal-900"
           href={item.originalUrl}
@@ -337,7 +363,7 @@ function EvaluationMetric({ label, value }) {
     <div>
       <span className="block font-medium text-slate-500">{label}</span>
       <span className="mt-1 block text-sm font-semibold text-slate-950">
-        {Number.isFinite(value) ? value.toFixed(2) : '-'}
+        {formatScore(value)}
       </span>
     </div>
   );
