@@ -1,9 +1,17 @@
 import { useEffect, useMemo, useState } from 'react';
-import { fetchDashboardSummary, fetchInfoItems } from './api/dashboardApi';
+import {
+  archiveInfoItem,
+  fetchDashboardSummary,
+  fetchInfoItems,
+  restoreInfoItem,
+  updateInfoItemDecisionStatus,
+} from './api/dashboardApi';
 import {
   HIDDEN_SECTION,
   PRIMARY_SECTIONS,
+  applyInfoItemUpdate,
   groupItemsByDashboardSection,
+  isHiddenDashboardItem,
 } from './dashboardSections';
 
 const summaryCards = [
@@ -28,12 +36,19 @@ const importanceLabels = {
   LOW: '낮음',
 };
 
+const decisionActions = [
+  { status: 'APPLY', label: '오늘' },
+  { status: 'HOLD', label: '나중' },
+  { status: 'UNREVIEWED', label: '검토' },
+];
+
 function App() {
   const [summary, setSummary] = useState(null);
   const [items, setItems] = useState([]);
   const [includeHidden, setIncludeHidden] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [pendingItemId, setPendingItemId] = useState(null);
 
   useEffect(() => {
     let ignore = false;
@@ -76,6 +91,22 @@ function App() {
   );
 
   const sections = includeHidden ? [...PRIMARY_SECTIONS, HIDDEN_SECTION] : PRIMARY_SECTIONS;
+
+  async function handleItemUpdate(action) {
+    setPendingItemId(action.id);
+    setError('');
+
+    try {
+      const updatedItem = await action.run();
+      const nextSummary = await fetchDashboardSummary();
+      setItems((currentItems) => applyInfoItemUpdate(currentItems, updatedItem, includeHidden));
+      setSummary(nextSummary);
+    } catch (nextError) {
+      setError(nextError.message);
+    } finally {
+      setPendingItemId(null);
+    }
+  }
 
   return (
     <main className="min-h-screen bg-slate-50">
@@ -123,6 +154,8 @@ function App() {
               section={section}
               items={groups[section.key] ?? []}
               loading={loading}
+              pendingItemId={pendingItemId}
+              onUpdateItem={handleItemUpdate}
             />
           ))}
         </div>
@@ -140,7 +173,7 @@ function SummaryCard({ label, value, loading }) {
   );
 }
 
-function DashboardSection({ section, items, loading }) {
+function DashboardSection({ section, items, loading, pendingItemId, onUpdateItem }) {
   return (
     <section className="flex min-h-80 flex-col rounded-md border border-slate-200 bg-white shadow-sm">
       <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
@@ -163,13 +196,24 @@ function DashboardSection({ section, items, loading }) {
           </p>
         ) : null}
 
-        {!loading && items.map((item) => <InfoItemCard key={item.id} item={item} />)}
+        {!loading &&
+          items.map((item) => (
+            <InfoItemCard
+              key={item.id}
+              item={item}
+              pending={pendingItemId === item.id}
+              onUpdateItem={onUpdateItem}
+            />
+          ))}
       </div>
     </section>
   );
 }
 
-function InfoItemCard({ item }) {
+function InfoItemCard({ item, pending, onUpdateItem }) {
+  const latestEvaluation = item.latestEvaluation;
+  const hidden = isHiddenDashboardItem(item);
+
   return (
     <article className="rounded-md border border-slate-200 bg-white p-4">
       <div className="flex flex-wrap items-center gap-2 text-xs font-semibold">
@@ -182,12 +226,65 @@ function InfoItemCard({ item }) {
         <span className="rounded-full bg-amber-50 px-2.5 py-1 text-amber-800">
           중요도 {importanceLabels[item.importanceLevel] ?? item.importanceLevel}
         </span>
+        {item.manualOverride ? (
+          <span className="rounded-full bg-indigo-50 px-2.5 py-1 text-indigo-800">
+            수동 반영
+          </span>
+        ) : null}
       </div>
 
       <h3 className="mt-3 line-clamp-2 text-base font-semibold leading-6 text-slate-950">
         {item.title}
       </h3>
       <p className="mt-2 line-clamp-3 text-sm leading-6 text-slate-600">{item.summary}</p>
+
+      {latestEvaluation ? (
+        <div className="mt-4 rounded-md border border-slate-200 bg-slate-50 px-3 py-3">
+          <div className="grid grid-cols-2 gap-2 text-xs text-slate-600 sm:grid-cols-4">
+            <EvaluationMetric label="관련" value={latestEvaluation.relevanceScore} />
+            <EvaluationMetric label="실행" value={latestEvaluation.actionabilityScore} />
+            <EvaluationMetric label="신규" value={latestEvaluation.noveltyScore} />
+            <EvaluationMetric label="확신" value={latestEvaluation.confidence} />
+          </div>
+          {latestEvaluation.reason ? (
+            <p className="mt-3 line-clamp-3 text-sm leading-5 text-slate-700">
+              {latestEvaluation.reason}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+
+      <div className="mt-4 flex flex-wrap gap-2">
+        {decisionActions.map((action) => (
+          <button
+            key={action.status}
+            className="rounded-md border border-slate-300 px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+            type="button"
+            disabled={pending || item.decisionStatus === action.status}
+            onClick={() =>
+              onUpdateItem({
+                id: item.id,
+                run: () => updateInfoItemDecisionStatus(item.id, action.status),
+              })
+            }
+          >
+            {action.label}
+          </button>
+        ))}
+        <button
+          className="rounded-md border border-slate-300 px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+          type="button"
+          disabled={pending}
+          onClick={() =>
+            onUpdateItem({
+              id: item.id,
+              run: () => (hidden ? restoreInfoItem(item.id) : archiveInfoItem(item.id)),
+            })
+          }
+        >
+          {hidden ? '복구' : '숨김'}
+        </button>
+      </div>
 
       <div className="mt-4 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
         <span>{item.sourceName}</span>
@@ -201,6 +298,17 @@ function InfoItemCard({ item }) {
         </a>
       </div>
     </article>
+  );
+}
+
+function EvaluationMetric({ label, value }) {
+  return (
+    <div>
+      <span className="block font-medium text-slate-500">{label}</span>
+      <span className="mt-1 block text-sm font-semibold text-slate-950">
+        {Number.isFinite(value) ? value.toFixed(2) : '-'}
+      </span>
+    </div>
   );
 }
 

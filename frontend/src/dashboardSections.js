@@ -26,6 +26,10 @@ export const HIDDEN_SECTION = {
   emptyText: '숨김 항목이 없습니다.',
 };
 
+export function isHiddenDashboardItem(item) {
+  return item.hidden || HIDDEN_SECTION.decisionStatuses.includes(item.decisionStatus);
+}
+
 export function groupItemsByDashboardSection(items, includeHidden) {
   const groups = Object.fromEntries(PRIMARY_SECTIONS.map((section) => [section.key, []]));
   groups[HIDDEN_SECTION.key] = [];
@@ -46,4 +50,19 @@ export function groupItemsByDashboardSection(items, includeHidden) {
   }
 
   return groups;
+}
+
+export function applyInfoItemUpdate(items, updatedItem, includeHidden) {
+  const shouldKeepItem = includeHidden || !isHiddenDashboardItem(updatedItem);
+  const hasExistingItem = items.some((item) => item.id === updatedItem.id);
+
+  if (!hasExistingItem && shouldKeepItem) {
+    return [updatedItem, ...items];
+  }
+
+  if (!shouldKeepItem) {
+    return items.filter((item) => item.id !== updatedItem.id);
+  }
+
+  return items.map((item) => (item.id === updatedItem.id ? updatedItem : item));
 }

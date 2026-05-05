@@ -213,7 +213,7 @@ Step 3 검토 전에는 구현하지 않는다.
 
 ## Step 5. Frontend Interaction
 
-Status: OPEN
+Status: DONE
 
 Step 4 검토 전에는 구현하지 않는다.
 
@@ -227,7 +227,7 @@ Step 4 검토 전에는 구현하지 않는다.
 
 ## Step 6. CollectionRun Skeleton
 
-Status: LOCKED
+Status: OPEN
 
 Step 5 검토 전에는 구현하지 않는다.
 

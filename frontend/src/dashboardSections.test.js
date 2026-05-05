@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { groupItemsByDashboardSection } from './dashboardSections';
+import { applyInfoItemUpdate, groupItemsByDashboardSection } from './dashboardSections';
 
 describe('groupItemsByDashboardSection', () => {
   const items = [
@@ -23,5 +23,32 @@ describe('groupItemsByDashboardSection', () => {
     const groups = groupItemsByDashboardSection(items, true);
 
     expect(groups.hidden.map((item) => item.id)).toEqual([4, 5]);
+  });
+});
+
+describe('applyInfoItemUpdate', () => {
+  it('replaces an updated visible item', () => {
+    const items = [
+      { id: 1, title: 'old', decisionStatus: 'UNREVIEWED', hidden: false },
+      { id: 2, title: 'other', decisionStatus: 'HOLD', hidden: false },
+    ];
+
+    const updated = { id: 1, title: 'new', decisionStatus: 'APPLY', hidden: false };
+
+    expect(applyInfoItemUpdate(items, updated, false)).toEqual([updated, items[1]]);
+  });
+
+  it('removes a hidden update when hidden items are excluded', () => {
+    const items = [{ id: 1, decisionStatus: 'UNREVIEWED', hidden: false }];
+    const updated = { id: 1, decisionStatus: 'ARCHIVE_CANDIDATE', hidden: true };
+
+    expect(applyInfoItemUpdate(items, updated, false)).toEqual([]);
+  });
+
+  it('keeps a hidden update when hidden items are included', () => {
+    const items = [{ id: 1, decisionStatus: 'UNREVIEWED', hidden: false }];
+    const updated = { id: 1, decisionStatus: 'ARCHIVE_CANDIDATE', hidden: true };
+
+    expect(applyInfoItemUpdate(items, updated, true)).toEqual([updated]);
   });
 });
