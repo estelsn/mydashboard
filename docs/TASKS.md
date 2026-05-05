@@ -753,7 +753,7 @@ Verification:
 
 ## Step 19. RSS / Official Source Collector
 
-Status: OPEN
+Status: DONE
 
 Goal:
 공식 블로그와 RSS 피드 기반 수집 흐름을 추가한다.
@@ -787,7 +787,7 @@ Verification:
 
 ## Step 20. Evaluation Pipeline
 
-Status: LOCKED
+Status: OPEN
 
 Goal:
 수집된 정보를 평가하는 파이프라인을 정리하고, 향후 LLM 평가 연동이 가능한 구조를 만든다.
