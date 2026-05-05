@@ -1,6 +1,38 @@
+# OS / IDE
 .DS_Store
+.idea/
+.vscode/
+
+# Local agent files
+.codex/
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Runtime / local data
+runtime/
+data/
+**/data/
+logs/
+*.log
+
+# Local databases
+*.mv.db
+*.trace.db
+*.lock.db
+
+# Gradle / Java / Spring outputs
 .gradle/
 build/
 **/build/
-data/
-**/data/
+backend/.gradle/
+backend/build/
+out/
+target/
+
+# Frontend outputs
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
