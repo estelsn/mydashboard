@@ -39,3 +39,13 @@ export function restoreInfoItem(id) {
     method: 'PATCH',
   });
 }
+
+export function fetchThreadsSessionStatus() {
+  return requestJson('/api/threads/session');
+}
+
+export function openThreadsLoginBrowser() {
+  return requestJson('/api/threads/session/open-login', {
+    method: 'POST',
+  });
+}

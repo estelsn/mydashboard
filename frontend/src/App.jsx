@@ -13,6 +13,7 @@ import {
   groupItemsByDashboardSection,
   isHiddenDashboardItem,
 } from './dashboardSections';
+import { ThreadsSessionPanel } from './ThreadsSessionPanel';
 
 const summaryCards = [
   { key: 'visibleCount', label: '기본 노출' },
@@ -140,6 +141,8 @@ function App() {
             />
           ))}
         </section>
+
+        <ThreadsSessionPanel />
 
         {error ? (
           <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">

@@ -599,7 +599,7 @@ Verification:
 
 ## Step 15. Frontend Threads Session Panel
 
-Status: OPEN
+Status: DONE
 
 Goal:
 프론트엔드에서 Threads 로그인 세션 상태를 확인하고, 로그인 브라우저를 열 수 있게 한다.
@@ -637,7 +637,7 @@ Verification:
 
 ## Step 16. Frontend Manual Threads Collection Trigger
 
-Status: LOCKED
+Status: OPEN
 
 Goal:
 프론트엔드에서 Threads 수집을 수동 실행하고 결과를 확인할 수 있게 한다.
