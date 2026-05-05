@@ -395,7 +395,7 @@ Verification:
 
 ## Step 11. Threads Fixture Parser
 
-Status: OPEN
+Status: DONE
 
 Goal:
 실제 브라우저 수집기를 붙이기 전에, Threads HTML/DOM/JSON snapshot에서 게시글 정보를 안정적으로 파싱하는 로직을 만든다.
@@ -435,7 +435,7 @@ Verification:
 
 ## Step 12. Threads Browser Collector
 
-Status: LOCKED
+Status: OPEN
 
 Goal:
 앱 전용 Chrome profile directory를 재사용해 로그인된 Threads 페이지에서 게시글 원문 데이터를 가져오는 수집기를 구현한다.
