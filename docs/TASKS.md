@@ -12,7 +12,7 @@ LOCKED로 표시된 Step은 구현하지 않는다.
 
 ## Step 1. Backend Domain Skeleton
 
-Status: OPEN
+Status: DONE
 
 ### 목표
 
@@ -156,7 +156,7 @@ Official/Future sources:
 
 ## Step 2. Backend API
 
-Status: LOCKED
+Status: OPEN
 
 Step 1 검토 전에는 구현하지 않는다.
 
