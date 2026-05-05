@@ -180,7 +180,7 @@ Step 1 검토 전에는 구현하지 않는다.
 
 ## Step 3. RuleBasedEvaluator
 
-Status: OPEN
+Status: DONE
 
 Step 2 검토 전에는 구현하지 않는다.
 
@@ -195,7 +195,7 @@ Step 2 검토 전에는 구현하지 않는다.
 
 ## Step 4. Frontend Dashboard Skeleton
 
-Status: LOCKED
+Status: DONE
 
 Step 3 검토 전에는 구현하지 않는다.
 
@@ -213,7 +213,7 @@ Step 3 검토 전에는 구현하지 않는다.
 
 ## Step 5. Frontend Interaction
 
-Status: LOCKED
+Status: OPEN
 
 Step 4 검토 전에는 구현하지 않는다.
 
