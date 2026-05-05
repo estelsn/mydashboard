@@ -239,7 +239,7 @@ Step 5 검토 전에는 구현하지 않는다.
 
 ## Step 7. Threads Collector Design Only
 
-Status: OPEN
+Status: DONE
 
 Step 6 검토 전에는 구현하지 않는다.
 
