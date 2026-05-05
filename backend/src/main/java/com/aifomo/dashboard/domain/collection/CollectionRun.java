@@ -43,12 +43,24 @@ public class CollectionRun {
     @Column(nullable = false)
     private int collectedItemCount;
 
+    @Column(nullable = false)
+    private int createdCount;
+
+    @Column(nullable = false)
+    private int duplicateCount;
+
+    @Column(nullable = false)
+    private int failedCount;
+
     private LocalDateTime startedAt;
 
     private LocalDateTime completedAt;
 
     @Lob
     private String statusMessage;
+
+    @Lob
+    private String failureReason;
 
     @Column(nullable = false)
     private LocalDateTime createdAt;
@@ -74,6 +86,30 @@ public class CollectionRun {
         this.startedAt = startedAt;
         this.completedAt = completedAt;
         this.statusMessage = statusMessage;
+    }
+
+    public void complete(
+            CollectionRunStatus status,
+            int successfulSourceCount,
+            int failedSourceCount,
+            int collectedItemCount,
+            int createdCount,
+            int duplicateCount,
+            int failedCount,
+            LocalDateTime completedAt,
+            String statusMessage,
+            String failureReason
+    ) {
+        this.status = status;
+        this.successfulSourceCount = successfulSourceCount;
+        this.failedSourceCount = failedSourceCount;
+        this.collectedItemCount = collectedItemCount;
+        this.createdCount = createdCount;
+        this.duplicateCount = duplicateCount;
+        this.failedCount = failedCount;
+        this.completedAt = completedAt;
+        this.statusMessage = statusMessage;
+        this.failureReason = failureReason;
     }
 
     @PrePersist

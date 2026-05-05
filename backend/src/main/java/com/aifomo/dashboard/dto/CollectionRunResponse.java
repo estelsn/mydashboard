@@ -12,9 +12,13 @@ public record CollectionRunResponse(
         int successfulSourceCount,
         int failedSourceCount,
         int collectedItemCount,
+        int createdCount,
+        int duplicateCount,
+        int failedCount,
         LocalDateTime startedAt,
         LocalDateTime completedAt,
         String statusMessage,
+        String failureReason,
         LocalDateTime createdAt,
         LocalDateTime updatedAt
 ) {
@@ -26,9 +30,13 @@ public record CollectionRunResponse(
                 collectionRun.getSuccessfulSourceCount(),
                 collectionRun.getFailedSourceCount(),
                 collectionRun.getCollectedItemCount(),
+                collectionRun.getCreatedCount(),
+                collectionRun.getDuplicateCount(),
+                collectionRun.getFailedCount(),
                 collectionRun.getStartedAt(),
                 collectionRun.getCompletedAt(),
                 collectionRun.getStatusMessage(),
+                collectionRun.getFailureReason(),
                 collectionRun.getCreatedAt(),
                 collectionRun.getUpdatedAt()
         );

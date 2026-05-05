@@ -486,7 +486,7 @@ Verification:
 
 ## Step 13. Threads Collection Persistence
 
-Status: OPEN
+Status: DONE
 
 Goal:
 Threads 수집 결과를 CollectedItem, InfoItem, CollectionRun 흐름에 연결해 DB에 저장한다.
@@ -532,7 +532,7 @@ Verification:
 
 ## Step 14. Manual Threads Collection API
 
-Status: LOCKED
+Status: OPEN
 
 Goal:
 사용자가 수동으로 Threads 계정 수집을 실행할 수 있는 API를 만든다.
