@@ -1,0 +1,230 @@
+package com.aifomo.dashboard.service;
+
+import com.aifomo.dashboard.collector.threads.ThreadsCollectedPost;
+import com.aifomo.dashboard.collector.threads.ThreadsCollectionProperties;
+import com.aifomo.dashboard.collector.threads.ThreadsCollectionRequest;
+import com.aifomo.dashboard.collector.threads.ThreadsCollectionResult;
+import com.aifomo.dashboard.collector.threads.ThreadsCollectionSleeper;
+import com.aifomo.dashboard.collector.threads.ThreadsCollectionStatus;
+import com.aifomo.dashboard.collector.threads.ThreadsCollector;
+import com.aifomo.dashboard.domain.source.Source;
+import com.aifomo.dashboard.domain.source.SourceCategory;
+import com.aifomo.dashboard.domain.source.SourceType;
+import com.aifomo.dashboard.dto.ManualThreadsCollectionRequest;
+import com.aifomo.dashboard.dto.ManualThreadsCollectionResponse;
+import com.aifomo.dashboard.repository.CollectedItemRepository;
+import com.aifomo.dashboard.repository.CollectionRunRepository;
+import com.aifomo.dashboard.repository.InfoItemRepository;
+import com.aifomo.dashboard.repository.SourceRepository;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
+
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.function.Function;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+@DataJpaTest
+class ManualThreadsCollectionServiceTest {
+
+    private static final Clock CLOCK = Clock.fixed(Instant.parse("2026-05-05T03:00:00Z"), ZoneId.of("Asia/Seoul"));
+    private static final LocalDateTime NOW = LocalDateTime.of(2026, 5, 5, 12, 0);
+
+    @Autowired
+    private SourceRepository sourceRepository;
+
+    @Autowired
+    private CollectionRunRepository collectionRunRepository;
+
+    @Autowired
+    private CollectedItemRepository collectedItemRepository;
+
+    @Autowired
+    private InfoItemRepository infoItemRepository;
+
+    private ThreadsCollectionProperties properties;
+    private CapturingSleeper sleeper;
+
+    @BeforeEach
+    void setUp() {
+        properties = new ThreadsCollectionProperties();
+        properties.getDefaults().setMaxPostsPerAccount(3);
+        properties.getDefaults().setMaxScrollCount(1);
+        properties.getLimits().setMaxPostsPerAccount(5);
+        properties.getLimits().setMaxScrollCount(2);
+        properties.getSafety().setDelayBetweenAccounts(Duration.ofSeconds(5));
+        properties.getSafety().setMinSourceRecollectionInterval(Duration.ofHours(1));
+        sleeper = new CapturingSleeper();
+    }
+
+    @Test
+    void clampsRequestedPostAndScrollLimitsBeforeCollecting() {
+        CapturingThreadsCollector collector = collector(request -> success(request.source(), "clamped"));
+        ManualThreadsCollectionResponse response = service(collector).collect(request(
+                List.of("https://www.threads.com/@choi.openai"),
+                100,
+                50
+        ));
+
+        assertThat(collector.requests).singleElement()
+                .satisfies(request -> {
+                    assertThat(request.maxItems()).isEqualTo(5);
+                    assertThat(request.maxScrollCount()).isEqualTo(2);
+                });
+        assertThat(response.requestedMaxPostsPerAccount()).isEqualTo(100);
+        assertThat(response.appliedMaxPostsPerAccount()).isEqualTo(5);
+        assertThat(response.requestedMaxScrollCount()).isEqualTo(50);
+        assertThat(response.appliedMaxScrollCount()).isEqualTo(2);
+    }
+
+    @Test
+    void delaysBetweenAccountsWithoutSleepingInTest() {
+        CapturingThreadsCollector collector = collector(request -> success(request.source(), request.source().getName()));
+
+        service(collector).collect(request(List.of(
+                "https://www.threads.com/@first",
+                "https://www.threads.com/@second"
+        ), 3, 1));
+
+        assertThat(collector.requests).hasSize(2);
+        assertThat(sleeper.durations).containsExactly(Duration.ofSeconds(5));
+    }
+
+    @Test
+    void stopsImmediatelyWhenLoginRequired() {
+        assertStopsOnRiskStatus(
+                ThreadsCollectionStatus.LOGIN_REQUIRED,
+                "Stopped because Threads session status was LOGIN_REQUIRED."
+        );
+    }
+
+    @Test
+    void stopsImmediatelyWhenAccessRestricted() {
+        assertStopsOnRiskStatus(
+                ThreadsCollectionStatus.ACCESS_RESTRICTED,
+                "Stopped because Threads access appeared restricted."
+        );
+    }
+
+    @Test
+    void stopsImmediatelyWhenTimedOut() {
+        assertStopsOnRiskStatus(
+                ThreadsCollectionStatus.TIMEOUT,
+                "Stopped because Threads collection timed out."
+        );
+    }
+
+    @Test
+    void skipsRecentlyCollectedSourceByCooldownPolicy() {
+        Source source = sourceRepository.save(new Source(
+                "Recent Threads",
+                SourceType.THREADS_ACCOUNT,
+                SourceCategory.NEWS,
+                "https://www.threads.com/@recent",
+                "recent",
+                true
+        ));
+        source.setLastCollectedAt(NOW.minusMinutes(30));
+        sourceRepository.save(source);
+        CapturingThreadsCollector collector = collector(request -> success(request.source(), "should not run"));
+
+        ManualThreadsCollectionResponse response = service(collector).collect(request(
+                List.of("https://www.threads.com/@recent"),
+                3,
+                1
+        ));
+
+        assertThat(collector.requests).isEmpty();
+        assertThat(response.status().name()).isEqualTo("SUCCEEDED");
+        assertThat(response.safetyMessage()).contains("COOLDOWN_SKIPPED");
+        assertThat(response.safetyMessage()).contains("2026-05-05T12:30");
+        assertThat(collectedItemRepository.findAll()).isEmpty();
+        assertThat(infoItemRepository.findAll()).isEmpty();
+    }
+
+    private void assertStopsOnRiskStatus(ThreadsCollectionStatus status, String safetyMessage) {
+        CapturingThreadsCollector collector = collector(request -> ThreadsCollectionResult.failure(
+                request.source(),
+                status,
+                status.name()
+        ));
+
+        ManualThreadsCollectionResponse response = service(collector).collect(request(List.of(
+                "https://www.threads.com/@first",
+                "https://www.threads.com/@second"
+        ), 3, 1));
+
+        assertThat(collector.requests).hasSize(1);
+        assertThat(sleeper.durations).isEmpty();
+        assertThat(response.status().name()).isEqualTo("FAILED");
+        assertThat(response.failureReason()).contains("status=" + status);
+        assertThat(response.safetyMessage()).isEqualTo(safetyMessage);
+    }
+
+    private ManualThreadsCollectionService service(ThreadsCollector collector) {
+        return new ManualThreadsCollectionService(
+                collectionRunRepository,
+                sourceRepository,
+                collector,
+                new ThreadsCollectionPersistenceService(
+                        collectionRunRepository,
+                        collectedItemRepository,
+                        infoItemRepository,
+                        CLOCK
+                ),
+                properties,
+                sleeper,
+                CLOCK
+        );
+    }
+
+    private CapturingThreadsCollector collector(Function<ThreadsCollectionRequest, ThreadsCollectionResult> handler) {
+        return new CapturingThreadsCollector(handler);
+    }
+
+    private ManualThreadsCollectionRequest request(List<String> accountUrls, int maxPostsPerAccount, int maxScrollCount) {
+        return new ManualThreadsCollectionRequest(accountUrls, maxPostsPerAccount, maxScrollCount);
+    }
+
+    private ThreadsCollectionResult success(Source source, String content) {
+        return new ThreadsCollectionResult(
+                source,
+                List.of(new ThreadsCollectedPost(source.getUrl() + "/post/1", content, NOW)),
+                List.of()
+        );
+    }
+
+    private static class CapturingThreadsCollector implements ThreadsCollector {
+
+        private final Function<ThreadsCollectionRequest, ThreadsCollectionResult> handler;
+        private final List<ThreadsCollectionRequest> requests = new ArrayList<>();
+
+        private CapturingThreadsCollector(Function<ThreadsCollectionRequest, ThreadsCollectionResult> handler) {
+            this.handler = handler;
+        }
+
+        @Override
+        public ThreadsCollectionResult collect(ThreadsCollectionRequest request) {
+            requests.add(request);
+            return handler.apply(request);
+        }
+    }
+
+    private static class CapturingSleeper implements ThreadsCollectionSleeper {
+
+        private final List<Duration> durations = new ArrayList<>();
+
+        @Override
+        public void sleep(Duration duration) {
+            durations.add(duration);
+        }
+    }
+}

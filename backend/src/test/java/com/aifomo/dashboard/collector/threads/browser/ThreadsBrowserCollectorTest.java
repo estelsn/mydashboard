@@ -1,6 +1,8 @@
 package com.aifomo.dashboard.collector.threads.browser;
 
 import com.aifomo.dashboard.collector.threads.ThreadsCollectionRequest;
+import com.aifomo.dashboard.collector.threads.ThreadsCollectionProperties;
+import com.aifomo.dashboard.collector.threads.ThreadsCollectionSleeper;
 import com.aifomo.dashboard.collector.threads.ThreadsCollectionStatus;
 import com.aifomo.dashboard.collector.threads.ThreadsPostParser;
 import com.aifomo.dashboard.collector.threads.session.BrowserSessionDescriptor;
@@ -14,9 +16,12 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Path;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -39,11 +44,16 @@ class ThreadsBrowserCollectorTest {
                   <div>Second post</div>
                 </article>
                 """));
+        CapturingSleeper sleeper = new CapturingSleeper();
+        ThreadsCollectionProperties collectionProperties = new ThreadsCollectionProperties();
+        collectionProperties.getSafety().setDelayBetweenScrolls(Duration.ofSeconds(3));
 
         var collector = collector(
                 readySession(),
                 pageClient,
-                properties
+                properties,
+                collectionProperties,
+                sleeper
         );
 
         var result = collector.collect(new ThreadsCollectionRequest(source(), 10, 4));
@@ -57,6 +67,12 @@ class ThreadsBrowserCollectorTest {
         assertThat(pageClient.request.profileDirectory()).isEqualTo(tempDir);
         assertThat(pageClient.request.headless()).isTrue();
         assertThat(pageClient.request.maxScrollCount()).isEqualTo(4);
+        assertThat(sleeper.durations).containsExactly(
+                Duration.ofSeconds(3),
+                Duration.ofSeconds(3),
+                Duration.ofSeconds(3),
+                Duration.ofSeconds(3)
+        );
     }
 
     @Test
@@ -116,11 +132,24 @@ class ThreadsBrowserCollectorTest {
             ThreadsBrowserPageClient pageClient,
             ThreadsBrowserCollectorProperties properties
     ) {
+        return collector(sessionProvider, pageClient, properties, new ThreadsCollectionProperties(), duration -> {
+        });
+    }
+
+    private ThreadsBrowserCollector collector(
+            BrowserSessionProvider sessionProvider,
+            ThreadsBrowserPageClient pageClient,
+            ThreadsBrowserCollectorProperties properties,
+            ThreadsCollectionProperties collectionProperties,
+            ThreadsCollectionSleeper sleeper
+    ) {
         return new ThreadsBrowserCollector(
                 sessionProvider,
                 pageClient,
                 new ThreadsPostParser(),
                 properties,
+                collectionProperties,
+                sleeper,
                 Clock.fixed(Instant.parse("2026-05-05T03:00:00Z"), ZoneId.of("Asia/Seoul"))
         );
     }
@@ -153,6 +182,16 @@ class ThreadsBrowserCollectorTest {
         public ThreadsBrowserPageSnapshot fetch(ThreadsBrowserPageRequest request) {
             this.request = request;
             return snapshot;
+        }
+    }
+
+    private static class CapturingSleeper implements ThreadsCollectionSleeper {
+
+        private final List<Duration> durations = new ArrayList<>();
+
+        @Override
+        public void sleep(Duration duration) {
+            durations.add(duration);
         }
     }
 }

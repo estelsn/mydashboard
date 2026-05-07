@@ -30,7 +30,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest(properties = {
         "spring.datasource.url=jdbc:h2:mem:aifomo-collection-run-api-test;DB_CLOSE_DELAY=-1",
-        "spring.jpa.hibernate.ddl-auto=create-drop"
+        "spring.jpa.hibernate.ddl-auto=create-drop",
+        "app.threads.collection.safety.min-source-recollection-interval=0s",
+        "app.threads.collection.safety.delay-between-accounts=0s",
+        "app.threads.collection.safety.delay-between-scrolls=0s"
 })
 @AutoConfigureMockMvc
 class CollectionRunApiTest {

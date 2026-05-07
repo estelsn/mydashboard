@@ -5,6 +5,7 @@ public enum ThreadsCollectionStatus {
     LOGIN_REQUIRED,
     ACCESS_RESTRICTED,
     EMPTY_RESULT,
+    COOLDOWN_SKIPPED,
     TIMEOUT,
     FAILED
 }

@@ -894,3 +894,301 @@ Verification:
 - frontend build 통과
 - README/docs 업데이트 완료
 - docs/TASKS.md에서 Step 22 DONE 상태로 갱신
+
+# Step 23. Threads Collection Safety Limits
+
+Status: DONE
+
+## Goal
+
+Threads 수집 기능을 실제 계정으로 검증하기 전에, 비정상적인 반복 접근 패턴을 줄이고 계정 보호 및 로컬 개발 안정성을 높이기 위한 안전 제한을 추가한다.
+
+이번 Step의 목적은 차단 회피가 아니라, 현재 구현된 Threads 수집 흐름이 과도한 요청·반복 실행·실패 재시도를 만들지 않도록 보수적인 제한 장치를 두는 것이다.
+
+## Background
+
+현재 프로젝트는 Threads를 우선 수집 소스로 사용한다.
+
+현재까지 확인된 상태:
+
+- Threads 세션 API 403 문제는 CORS POST 허용 누락으로 확인되어 수정 완료
+- `POST /api/threads/session/open-login` 호출 시 앱 전용 Chrome 프로필이 열림
+- 사용자는 열린 Chrome에서 직접 Threads에 로그인함
+- 앱에서는 `Threads 세션 준비됨` 상태가 표시됨
+- 프로필 경로는 `runtime/browser-profiles/threads`
+- 현재 구조에는 `maxPostsPerAccount`, `maxScrollCount` 같은 수집량 제한은 있음
+- 하지만 스크롤 간 대기, 계정 간 대기, 실패 시 중단/백오프, Source별 재수집 쿨다운 같은 본격적인 safety limit은 아직 명확히 구현되어 있지 않음
+
+따라서 실제 수집 시연 전에 안전 제한을 먼저 추가한다.
+
+## Scope
+
+이번 Step에서 수행할 작업:
+
+1. Threads 수집 기본값을 보수적으로 유지한다.
+2. 수집 요청값에 상한선을 둔다.
+3. 계정 URL 사이 delay를 추가한다.
+4. 스크롤 사이 delay를 추가한다.
+5. 세션/접근 제한/타임아웃 계열 오류 발생 시 즉시 중단한다.
+6. 같은 Source를 너무 자주 재수집하지 않도록 최소 재수집 간격을 둔다.
+7. 관련 설정을 `application.yml`에서 조정 가능하게 분리한다.
+8. 외부 Threads 접속 없이 stub/fake 기반 테스트를 추가한다.
+9. 프론트엔드에는 현재 적용 중인 제한값이나 안내 메시지를 최소한으로 노출한다.
+
+## Non-goals
+
+이번 Step에서 절대 하지 말 것:
+
+- 실제 Threads 크롤링 기능을 새로 구현하지 않는다.
+- Playwright를 추가하지 않는다.
+- Puppeteer를 추가하지 않는다.
+- GraphQL 호출을 추가하지 않는다.
+- Threads ID/PW 자동 로그인을 구현하지 않는다.
+- 인증코드 자동 처리를 구현하지 않는다.
+- 쿠키/토큰 추출 기능을 구현하지 않는다.
+- 차단 우회, 탐지 회피, 헤더 위조, 프록시 순환 같은 기능을 구현하지 않는다.
+- 대량 수집 최적화를 하지 않는다.
+- 서버 배포용 원격 Chrome/GUI 구조를 구현하지 않는다.
+
+## Backend Requirements
+
+### 1. Configuration
+
+Threads 수집 안전 제한 설정을 `application.yml`에서 관리할 수 있게 한다.
+
+예시 구조:
+
+```yaml
+threads:
+  collection:
+    defaults:
+      max-posts-per-account: 3
+      max-scroll-count: 1
+    limits:
+      max-posts-per-account: 5
+      max-scroll-count: 2
+    safety:
+      delay-between-accounts-ms: 5000
+      delay-between-scrolls-ms: 3000
+      min-source-recollection-interval-minutes: 60
+      stop-on-statuses:
+        - ACCESS_RESTRICTED
+        - LOGIN_REQUIRED
+        - TIMEOUT
+```
+
+구체적인 property class 이름은 기존 프로젝트 컨벤션에 맞춘다.
+
+권장 이름:
+
+- `ThreadsCollectionProperties`
+- `ThreadsCollectionSafetyProperties`
+
+단, 이미 유사한 설정 클래스가 있다면 기존 구조를 확장한다.
+
+### 2. Request Value Clamping
+
+수집 요청에서 다음 값이 들어오더라도 backend에서 안전 상한을 적용한다.
+
+- `maxPostsPerAccount`
+- `maxScrollCount`
+
+예시:
+
+```text
+요청값 maxPostsPerAccount = 100
+설정 상한 maxPostsPerAccount = 5
+실제 적용값 = 5
+```
+
+상한 적용 결과는 `CollectionRun` 또는 응답 DTO에서 확인 가능하게 하는 것이 좋다.
+
+가능하면 다음 정보를 남긴다.
+
+- requestedMaxPostsPerAccount
+- appliedMaxPostsPerAccount
+- requestedMaxScrollCount
+- appliedMaxScrollCount
+
+기존 엔티티 구조를 과하게 변경해야 한다면 로그/응답 DTO 수준에서만 처리해도 된다.
+
+### 3. Delay Between Accounts
+
+여러 account URL을 수집할 때 account 간 delay를 적용한다.
+
+조건:
+
+- delay 값은 설정에서 관리한다.
+- 테스트에서는 실제 sleep으로 테스트가 느려지지 않도록 sleeper/clock abstraction 또는 fake delay를 사용한다.
+- delay 구현 때문에 단위 테스트가 불안정해지면 안 된다.
+
+권장 구조:
+
+```text
+DelayStrategy 또는 Sleeper 인터페이스
+- production: Thread.sleep 또는 Duration 기반 sleep
+- test: no-op fake sleeper
+```
+
+### 4. Delay Between Scrolls
+
+기존 수집 구조에 스크롤 개념이 있다면 scroll 사이 delay를 적용한다.
+
+아직 실제 스크롤 구현이 stub 수준이라면:
+
+- 현재 adapter/service 경계에 delay hook만 추가한다.
+- 실제 브라우저 자동화 구현은 추가하지 않는다.
+- 테스트는 delay 호출 여부를 fake로 검증한다.
+
+### 5. Stop on Risk Status
+
+다음 상태가 발생하면 해당 collection run은 즉시 중단한다.
+
+- `ACCESS_RESTRICTED`
+- `LOGIN_REQUIRED`
+- `TIMEOUT`
+
+처리 기준:
+
+- 같은 run 안에서 다음 account로 계속 진행하지 않는다.
+- 실패 상태와 failureReason을 명확히 기록한다.
+- 프론트엔드에서 사용자에게 “세션 확인 필요”, “접근 제한 가능성”, “시간 초과” 같은 의미가 전달되도록 한다.
+
+권장 failureReason 예시:
+
+```text
+Stopped because Threads session status was LOGIN_REQUIRED.
+Stopped because Threads access appeared restricted.
+Stopped because Threads collection timed out.
+```
+
+### 6. Source Recollection Cooldown
+
+같은 Source를 너무 짧은 간격으로 재수집하지 않도록 최소 재수집 간격을 둔다.
+
+기준:
+
+- Source별 `lastCollectedAt`이 이미 있다면 이를 사용한다.
+- 없다면 기존 엔티티 구조에서 가장 작은 변경으로 구현한다.
+- 구조 변경이 커진다면 `CollectionRun` 기록 기준으로 최근 성공/시도 시간을 조회해 skip 처리한다.
+
+동작:
+
+```text
+현재 시각 - 마지막 수집 시각 < min-source-recollection-interval
+→ 해당 Source skip
+→ CollectionRun summary에 skipped count 반영
+```
+
+권장 기록:
+
+- skippedSourceCount
+- skippedReason
+- nextAllowedCollectionAt
+
+단, 현재 구조에 없는 필드를 무리하게 많이 추가하지 말고 기존 요약 구조에 맞춰 최소 변경한다.
+
+### 7. Dry-run / Stub Mode Clarification
+
+현재 Threads 수집이 stub/adapter 수준이라면, 실제 외부 접속이 발생하지 않는 테스트 모드를 명확히 유지한다.
+
+요구사항:
+
+- 테스트는 외부 Threads 접속 없이 통과해야 한다.
+- 실제 Chrome/Threads 페이지 접근을 테스트에서 수행하지 않는다.
+- fixture/stub/fake adapter 기반으로 safety limit 동작을 검증한다.
+
+## Frontend Requirements
+
+프론트엔드는 과하게 복잡하게 만들지 않는다.
+
+최소 요구사항:
+
+1. 수집 요청 기본값을 안전한 값으로 표시한다.
+   - `maxPostsPerAccount`: 기본 1~3 범위
+   - `maxScrollCount`: 기본 0~1 범위
+
+2. backend 상한보다 큰 값을 입력한 경우 사용자에게 안내하거나 backend 응답의 applied value를 표시한다.
+
+3. 수집 실행 영역에 안전 안내 문구를 추가한다.
+
+예시 문구:
+
+```text
+Threads 수집은 계정 보호를 위해 낮은 기본값과 대기 시간을 적용합니다. 로그인 필요, 접근 제한, 시간 초과가 감지되면 수집을 즉시 중단합니다.
+```
+
+4. `LOGIN_REQUIRED`, `ACCESS_RESTRICTED`, `TIMEOUT`, `COOLDOWN_SKIPPED` 계열 상태가 응답에 포함될 경우 사용자에게 구분 가능한 메시지를 표시한다.
+
+## Testing Requirements
+
+### Backend Tests
+
+다음을 테스트한다.
+
+1. `maxPostsPerAccount` 요청값이 설정 상한을 넘으면 상한으로 clamp되는지
+2. `maxScrollCount` 요청값이 설정 상한을 넘으면 상한으로 clamp되는지
+3. account 간 delay가 호출되는지
+4. scroll 간 delay가 호출되는지
+5. `LOGIN_REQUIRED` 발생 시 run이 즉시 중단되는지
+6. `ACCESS_RESTRICTED` 발생 시 run이 즉시 중단되는지
+7. `TIMEOUT` 발생 시 run이 즉시 중단되는지
+8. 최근 수집된 Source가 cooldown 정책에 따라 skip되는지
+9. 테스트가 실제 Threads/Chrome/외부 네트워크에 접근하지 않는지
+
+### Frontend Tests
+
+다음을 테스트한다.
+
+1. 안전 기본값이 화면에 반영되는지
+2. 수집 실행 시 API 요청 payload가 낮은 기본값을 사용하는지
+3. backend 응답의 applied value 또는 safety message가 표시되는지
+4. `LOGIN_REQUIRED`, `ACCESS_RESTRICTED`, `TIMEOUT` 응답 메시지가 구분되어 표시되는지
+5. API 에러 발생 시 기존 화면이 깨지지 않는지
+
+## Verification Commands
+
+작업 후 반드시 다음 명령을 실행한다.
+
+```bash
+GRADLE_USER_HOME=.gradle ./gradlew :backend:test
+cd frontend && npm test
+cd frontend && npm run build
+```
+
+필요하면 backend build도 추가로 실행한다.
+
+```bash
+GRADLE_USER_HOME=.gradle ./gradlew build
+```
+
+## Acceptance Criteria
+
+이 Step은 다음 조건을 만족하면 완료로 본다.
+
+- CORS/open-login 기존 수정 사항을 깨뜨리지 않는다.
+- `POST /api/threads/session/open-login`은 계속 정상 동작한다.
+- Threads 세션 상태 조회는 `READY` 또는 `LOGIN_REQUIRED` 같은 상태 payload로 표현된다.
+- 수집 요청값은 backend에서 안전 상한을 적용한다.
+- 계정 간 delay 설정이 존재한다.
+- 스크롤 간 delay 설정이 존재한다.
+- 위험 상태 발생 시 run이 즉시 중단된다.
+- 같은 Source에 대한 재수집 cooldown 또는 skip 정책이 존재한다.
+- 테스트는 외부 Threads 접속 없이 통과한다.
+- backend test, frontend test, frontend build가 성공한다.
+- git commit은 Codex가 직접 수행하지 않는다.
+- Codex는 작업 완료 후 변경 파일, 구현 요약, 검증 결과, 제외한 범위, 한국어 커밋 메시지 제안만 보고한다.
+
+## Commit Message Suggestion Format
+
+Codex는 실제 commit을 수행하지 말고, 아래 형식으로 한국어 커밋 메시지만 제안한다.
+
+```bash
+git add backend frontend docs/TASKS.md
+git commit -m "feat: Threads 수집 안전 제한 추가" \
+  -m "Threads 수집 요청의 기본값과 상한을 보수적으로 적용하고, 계정 및 스크롤 사이 대기 설정을 추가했다.
+
+LOGIN_REQUIRED, ACCESS_RESTRICTED, TIMEOUT 상태가 감지되면 수집을 즉시 중단하도록 정리하고, 같은 Source를 짧은 간격으로 반복 수집하지 않도록 cooldown 또는 skip 정책을 추가했다.
+
+프론트엔드에는 안전 제한 안내와 상태별 메시지를 반영했으며, 외부 Threads 접속 없이 동작을 검증하는 backend/frontend 테스트를 추가했다."
+```

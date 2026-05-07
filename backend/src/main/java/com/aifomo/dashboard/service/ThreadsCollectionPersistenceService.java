@@ -87,12 +87,19 @@ public class ThreadsCollectionPersistenceService {
         for (ThreadsCollectionResult result : results) {
             collectedItemCount += result.posts().size();
 
-            if (result.status() != ThreadsCollectionStatus.SUCCESS && result.status() != ThreadsCollectionStatus.EMPTY_RESULT) {
+            if (result.status() != ThreadsCollectionStatus.SUCCESS
+                    && result.status() != ThreadsCollectionStatus.EMPTY_RESULT
+                    && result.status() != ThreadsCollectionStatus.COOLDOWN_SKIPPED) {
                 failedSourceCount++;
                 failedCount += result.posts().size();
                 String failureReason = statusMessage(result);
                 failures.add(failureReason);
                 messages.add(failureReason);
+                continue;
+            }
+
+            if (result.status() == ThreadsCollectionStatus.COOLDOWN_SKIPPED) {
+                messages.add(statusMessage(result));
                 continue;
             }
 

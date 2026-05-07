@@ -27,6 +27,21 @@ app:
       login-url: https://www.threads.net/
     browser-collector:
       headless: false
-      max-scroll-count: 5
-      max-posts-per-account: 20
+      max-scroll-count: 1
+      max-posts-per-account: 3
       timeout: 20s
+    collection:
+      defaults:
+        max-posts-per-account: 3
+        max-scroll-count: 1
+      limits:
+        max-posts-per-account: 5
+        max-scroll-count: 2
+      safety:
+        delay-between-accounts: 5s
+        delay-between-scrolls: 3s
+        min-source-recollection-interval: 60m
+        stop-on-statuses:
+          - ACCESS_RESTRICTED
+          - LOGIN_REQUIRED
+          - TIMEOUT

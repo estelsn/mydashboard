@@ -10,9 +10,25 @@ public record ManualThreadsCollectionResponse(
         int createdCount,
         int duplicateCount,
         int failedCount,
-        String failureReason
+        String failureReason,
+        int requestedMaxPostsPerAccount,
+        int appliedMaxPostsPerAccount,
+        int requestedMaxScrollCount,
+        int appliedMaxScrollCount,
+        String safetyMessage
 ) {
     public static ManualThreadsCollectionResponse from(CollectionRun run) {
+        return from(run, 0, 0, 0, 0, null);
+    }
+
+    public static ManualThreadsCollectionResponse from(
+            CollectionRun run,
+            int requestedMaxPostsPerAccount,
+            int appliedMaxPostsPerAccount,
+            int requestedMaxScrollCount,
+            int appliedMaxScrollCount,
+            String safetyMessage
+    ) {
         return new ManualThreadsCollectionResponse(
                 run.getId(),
                 run.getStatus(),
@@ -20,7 +36,12 @@ public record ManualThreadsCollectionResponse(
                 run.getCreatedCount(),
                 run.getDuplicateCount(),
                 run.getFailedCount(),
-                run.getFailureReason()
+                run.getFailureReason(),
+                requestedMaxPostsPerAccount,
+                appliedMaxPostsPerAccount,
+                requestedMaxScrollCount,
+                appliedMaxScrollCount,
+                safetyMessage
         );
     }
 }

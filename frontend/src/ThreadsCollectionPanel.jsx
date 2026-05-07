@@ -16,10 +16,17 @@ const runStatusTones = {
   PARTIAL_SUCCESS: 'amber',
 };
 
+const safetyStatusMessages = {
+  LOGIN_REQUIRED: '세션 확인 필요: Threads 로그인이 필요합니다.',
+  ACCESS_RESTRICTED: '접근 제한 가능성: 수집을 즉시 중단했습니다.',
+  TIMEOUT: '시간 초과: 수집을 즉시 중단했습니다.',
+  COOLDOWN_SKIPPED: '최근 수집된 Source라서 쿨다운 정책에 따라 건너뛰었습니다.',
+};
+
 export function ThreadsCollectionPanel({ onDashboardRefresh }) {
   const [accountUrl, setAccountUrl] = useState('');
-  const [maxPostsPerAccount, setMaxPostsPerAccount] = useState(20);
-  const [maxScrollCount, setMaxScrollCount] = useState(5);
+  const [maxPostsPerAccount, setMaxPostsPerAccount] = useState(3);
+  const [maxScrollCount, setMaxScrollCount] = useState(1);
   const [runs, setRuns] = useState([]);
   const [loadingRuns, setLoadingRuns] = useState(true);
   const [collecting, setCollecting] = useState(false);
@@ -104,6 +111,10 @@ export function ThreadsCollectionPanel({ onDashboardRefresh }) {
         <form className="flex flex-col gap-4" onSubmit={handleCollect}>
           <div>
             <h2 className="text-base font-semibold text-slate-950">Threads 수동 수집</h2>
+            <p className="mt-1 text-sm text-slate-600">
+              Threads 수집은 계정 보호를 위해 낮은 기본값과 대기 시간을 적용합니다. 로그인 필요,
+              접근 제한, 시간 초과가 감지되면 수집을 즉시 중단합니다.
+            </p>
           </div>
 
           <label className="flex flex-col gap-1.5 text-sm font-medium text-slate-700">
@@ -124,7 +135,7 @@ export function ThreadsCollectionPanel({ onDashboardRefresh }) {
                 className="rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-950 shadow-sm outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
                 type="number"
                 min="1"
-                max="100"
+                max="5"
                 value={maxPostsPerAccount}
                 onChange={(event) => setMaxPostsPerAccount(event.target.value)}
               />
@@ -135,7 +146,7 @@ export function ThreadsCollectionPanel({ onDashboardRefresh }) {
                 className="rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-950 shadow-sm outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
                 type="number"
                 min="0"
-                max="50"
+                max="2"
                 value={maxScrollCount}
                 onChange={(event) => setMaxScrollCount(event.target.value)}
               />
@@ -181,6 +192,7 @@ export function ThreadsCollectionPanel({ onDashboardRefresh }) {
           {result.failureReason ? (
             <span className="mt-2 block text-red-800">실패 사유: {result.failureReason}</span>
           ) : null}
+          <SafetyResultMessage result={result} />
         </StateMessage>
       ) : null}
 
@@ -190,6 +202,24 @@ export function ThreadsCollectionPanel({ onDashboardRefresh }) {
         </StateMessage>
       ) : null}
     </section>
+  );
+}
+
+function SafetyResultMessage({ result }) {
+  const explicitMessage = Object.entries(safetyStatusMessages).find(([status]) =>
+    [result.failureReason, result.safetyMessage].some((value) => value?.includes(status)),
+  )?.[1];
+  const appliedMessage =
+    result.requestedMaxPostsPerAccount && result.appliedMaxPostsPerAccount
+      ? `적용 제한: 계정당 게시물 ${result.appliedMaxPostsPerAccount}/${result.requestedMaxPostsPerAccount}, 스크롤 ${result.appliedMaxScrollCount}/${result.requestedMaxScrollCount}`
+      : '';
+
+  return (
+    <>
+      {appliedMessage ? <span className="mt-2 block">{appliedMessage}</span> : null}
+      {result.safetyMessage ? <span className="mt-1 block">{result.safetyMessage}</span> : null}
+      {explicitMessage ? <span className="mt-1 block">{explicitMessage}</span> : null}
+    </>
   );
 }
 

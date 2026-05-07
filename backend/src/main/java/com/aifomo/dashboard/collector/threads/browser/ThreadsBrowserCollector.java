@@ -3,6 +3,8 @@ package com.aifomo.dashboard.collector.threads.browser;
 import com.aifomo.dashboard.collector.threads.ThreadsCollectedPost;
 import com.aifomo.dashboard.collector.threads.ThreadsCollectionRequest;
 import com.aifomo.dashboard.collector.threads.ThreadsCollectionResult;
+import com.aifomo.dashboard.collector.threads.ThreadsCollectionProperties;
+import com.aifomo.dashboard.collector.threads.ThreadsCollectionSleeper;
 import com.aifomo.dashboard.collector.threads.ThreadsCollectionStatus;
 import com.aifomo.dashboard.collector.threads.ThreadsCollector;
 import com.aifomo.dashboard.collector.threads.ThreadsParsedPost;
@@ -16,17 +18,20 @@ import org.springframework.stereotype.Component;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
+import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
 
 @Component
-@EnableConfigurationProperties(ThreadsBrowserCollectorProperties.class)
+@EnableConfigurationProperties({ThreadsBrowserCollectorProperties.class, ThreadsCollectionProperties.class})
 public class ThreadsBrowserCollector implements ThreadsCollector {
 
     private final BrowserSessionProvider sessionProvider;
     private final ThreadsBrowserPageClient pageClient;
     private final ThreadsPostParser parser;
     private final ThreadsBrowserCollectorProperties properties;
+    private final ThreadsCollectionProperties collectionProperties;
+    private final ThreadsCollectionSleeper sleeper;
     private final Clock clock;
 
     @Autowired
@@ -34,9 +39,11 @@ public class ThreadsBrowserCollector implements ThreadsCollector {
             BrowserSessionProvider sessionProvider,
             ThreadsBrowserPageClient pageClient,
             ThreadsPostParser parser,
-            ThreadsBrowserCollectorProperties properties
+            ThreadsBrowserCollectorProperties properties,
+            ThreadsCollectionProperties collectionProperties,
+            ThreadsCollectionSleeper sleeper
     ) {
-        this(sessionProvider, pageClient, parser, properties, Clock.systemDefaultZone());
+        this(sessionProvider, pageClient, parser, properties, collectionProperties, sleeper, Clock.systemDefaultZone());
     }
 
     ThreadsBrowserCollector(
@@ -44,12 +51,16 @@ public class ThreadsBrowserCollector implements ThreadsCollector {
             ThreadsBrowserPageClient pageClient,
             ThreadsPostParser parser,
             ThreadsBrowserCollectorProperties properties,
+            ThreadsCollectionProperties collectionProperties,
+            ThreadsCollectionSleeper sleeper,
             Clock clock
     ) {
         this.sessionProvider = sessionProvider;
         this.pageClient = pageClient;
         this.parser = parser;
         this.properties = properties;
+        this.collectionProperties = collectionProperties;
+        this.sleeper = sleeper;
         this.clock = clock;
     }
 
@@ -63,11 +74,13 @@ public class ThreadsBrowserCollector implements ThreadsCollector {
         }
 
         int postLimit = postLimit(request);
+        int maxScrollCount = normalizedMaxScrollCount(request);
+        delayBetweenScrolls(maxScrollCount);
         ThreadsBrowserPageSnapshot snapshot = pageClient.fetch(new ThreadsBrowserPageRequest(
                 request.source().getUrl(),
                 session.profileDirectory(),
                 properties.isHeadless(),
-                normalizedMaxScrollCount(request),
+                maxScrollCount,
                 properties.getTimeout()
         ));
         if (snapshot.status() != ThreadsBrowserPageStatus.SUCCESS) {
@@ -123,6 +136,13 @@ public class ThreadsBrowserCollector implements ThreadsCollector {
             return request.maxScrollCount();
         }
         return Math.max(0, properties.getMaxScrollCount());
+    }
+
+    private void delayBetweenScrolls(int maxScrollCount) {
+        Duration delay = collectionProperties.getSafety().getDelayBetweenScrolls();
+        for (int index = 1; index <= maxScrollCount; index++) {
+            sleeper.sleep(delay);
+        }
     }
 
     private static ThreadsCollectionStatus toCollectionStatus(ThreadsBrowserPageStatus status) {
