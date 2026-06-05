@@ -33,6 +33,7 @@ export function ThreadsCollectionPanel({ onDashboardRefresh }) {
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
   const busy = collecting || collectingRecent;
+  const resultFailureReason = summarizeFailureReason(result?.failureReason);
 
   async function refreshRuns() {
     setLoadingRuns(true);
@@ -229,8 +230,10 @@ export function ThreadsCollectionPanel({ onDashboardRefresh }) {
         <StateMessage tone={result.failedCount > 0 ? 'warning' : 'success'} className="mt-4">
           실행 결과: 수집 {result.collectedCount}, 생성 {result.createdCount}, 중복{' '}
           {result.duplicateCount}, 실패 {result.failedCount}
-          {result.failureReason ? (
-            <span className="mt-2 block text-red-800">실패 사유: {result.failureReason}</span>
+          {resultFailureReason ? (
+            <span className="mt-2 block whitespace-pre-wrap break-words text-red-800">
+              실패 사유: {resultFailureReason}
+            </span>
           ) : null}
           <SafetyResultMessage result={result} />
         </StateMessage>
@@ -272,6 +275,7 @@ function SafetyResultMessage({ result }) {
 function CollectionRunRow({ run }) {
   const statusLabel = runStatusLabels[run.status] ?? run.status;
   const statusTone = runStatusTones[run.status] ?? runStatusTones.FAILED;
+  const failureReason = summarizeFailureReason(run.failureReason);
 
   return (
     <article className="rounded-md border border-slate-200 px-3 py-3">
@@ -289,11 +293,23 @@ function CollectionRunRow({ run }) {
       <p className="mt-1 text-xs text-slate-500">
         생성 {formatDateTime(run.createdAt)} · 갱신 {formatDateTime(run.updatedAt)}
       </p>
-      {run.failureReason ? (
-        <p className="mt-2 rounded-md border border-red-100 bg-red-50 px-2.5 py-2 text-sm text-red-700">
-          실패 사유: {run.failureReason}
+      {failureReason ? (
+        <p className="mt-2 whitespace-pre-wrap break-words rounded-md border border-red-100 bg-red-50 px-2.5 py-2 text-sm text-red-700">
+          실패 사유: {failureReason}
         </p>
       ) : null}
     </article>
   );
+}
+
+function summarizeFailureReason(failureReason) {
+  if (!failureReason) {
+    return failureReason;
+  }
+
+  const compactReason = failureReason.replace(/\s+/g, ' ').trim();
+  if (compactReason.length <= 220) {
+    return compactReason;
+  }
+  return `${compactReason.slice(0, 220)}...`;
 }

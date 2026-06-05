@@ -47,6 +47,16 @@ class DefaultThreadsBrowserPageClientTest {
         assertThat(snapshot.status()).isEqualTo(ThreadsBrowserPageStatus.TIMEOUT);
     }
 
+    @Test
+    void sanitizesProfileLockFailureMessage() {
+        ThreadsBrowserPageSnapshot snapshot = client((chromeExecutable, request) -> {
+            throw new IllegalStateException("Failed to create /tmp/threads/SingletonLock: File exists (17)");
+        }).fetch(request());
+
+        assertThat(snapshot.status()).isEqualTo(ThreadsBrowserPageStatus.FAILED);
+        assertThat(snapshot.message()).isEqualTo("Threads 브라우저 프로필이 다른 Chrome 인스턴스에서 사용 중입니다. Threads 관련 Chrome 창을 닫고 다시 시도하세요.");
+    }
+
     private DefaultThreadsBrowserPageClient client(ThreadsBrowserAutomation automation) {
         ThreadsBrowserSessionProperties properties = new ThreadsBrowserSessionProperties();
         properties.setChromeExecutable("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome");
