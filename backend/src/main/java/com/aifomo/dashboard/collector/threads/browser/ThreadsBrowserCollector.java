@@ -142,7 +142,7 @@ public class ThreadsBrowserCollector implements ThreadsCollector {
     }
 
     private int normalizedMaxScrollCount(ThreadsCollectionRequest request) {
-        return Math.max(0, request.maxScrollCount());
+        return request.maxScrollCount();
     }
 
     private void delayBetweenScrolls(int maxScrollCount) {

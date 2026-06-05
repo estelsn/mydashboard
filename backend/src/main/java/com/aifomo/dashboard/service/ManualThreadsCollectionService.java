@@ -135,7 +135,7 @@ public class ManualThreadsCollectionService {
             List<ThreadsCollectionResult> results = collectRecentAccounts(
                     accountUrls,
                     properties.getDefaults().getMaxPostsPerAccount(),
-                    0,
+                    properties.getDefaults().getMaxScrollCount(),
                     LocalDateTime.now(clock).minusDays(RECENT_DAYS),
                     run
             );
@@ -143,8 +143,8 @@ public class ManualThreadsCollectionService {
                     persistenceService.persist(run, results),
                     properties.getDefaults().getMaxPostsPerAccount(),
                     properties.getDefaults().getMaxPostsPerAccount(),
-                    0,
-                    0,
+                    properties.getDefaults().getMaxScrollCount(),
+                    properties.getDefaults().getMaxScrollCount(),
                     recentCollectionSafetyMessage(results, accountUrls.size())
             );
         } catch (RuntimeException exception) {
@@ -153,8 +153,8 @@ public class ManualThreadsCollectionService {
                     failedRun,
                     properties.getDefaults().getMaxPostsPerAccount(),
                     properties.getDefaults().getMaxPostsPerAccount(),
-                    0,
-                    0,
+                    properties.getDefaults().getMaxScrollCount(),
+                    properties.getDefaults().getMaxScrollCount(),
                     exception.getMessage()
             );
         }

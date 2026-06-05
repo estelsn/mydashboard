@@ -57,9 +57,9 @@ class ManualThreadsCollectionServiceTest {
     void setUp() {
         properties = new ThreadsCollectionProperties();
         properties.getDefaults().setMaxPostsPerAccount(3);
-        properties.getDefaults().setMaxScrollCount(0);
+        properties.getDefaults().setMaxScrollCount(8);
         properties.getLimits().setMaxPostsPerAccount(5);
-        properties.getLimits().setMaxScrollCount(0);
+        properties.getLimits().setMaxScrollCount(12);
         properties.getSafety().setDelayBetweenAccounts(Duration.ofSeconds(5));
         properties.getSafety().setMinSourceRecollectionInterval(Duration.ofHours(1));
         sleeper = new CapturingSleeper();
@@ -77,12 +77,12 @@ class ManualThreadsCollectionServiceTest {
         assertThat(collector.requests).singleElement()
                 .satisfies(request -> {
                     assertThat(request.maxItems()).isEqualTo(5);
-                    assertThat(request.maxScrollCount()).isZero();
+                    assertThat(request.maxScrollCount()).isEqualTo(12);
                 });
         assertThat(response.requestedMaxPostsPerAccount()).isEqualTo(100);
         assertThat(response.appliedMaxPostsPerAccount()).isEqualTo(5);
         assertThat(response.requestedMaxScrollCount()).isEqualTo(50);
-        assertThat(response.appliedMaxScrollCount()).isZero();
+        assertThat(response.appliedMaxScrollCount()).isEqualTo(12);
     }
 
     @Test
