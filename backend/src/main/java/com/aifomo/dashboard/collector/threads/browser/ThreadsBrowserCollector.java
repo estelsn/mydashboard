@@ -8,6 +8,7 @@ import com.aifomo.dashboard.collector.threads.ThreadsCollectionSleeper;
 import com.aifomo.dashboard.collector.threads.ThreadsCollectionStatus;
 import com.aifomo.dashboard.collector.threads.ThreadsCollector;
 import com.aifomo.dashboard.collector.threads.ThreadsParsedPost;
+import com.aifomo.dashboard.collector.threads.ThreadsPostDateResolver;
 import com.aifomo.dashboard.collector.threads.ThreadsPostParser;
 import com.aifomo.dashboard.collector.threads.session.BrowserSessionDescriptor;
 import com.aifomo.dashboard.collector.threads.session.BrowserSessionProvider;
@@ -17,10 +18,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.time.Clock;
-import java.time.LocalDateTime;
 import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
 @Component
 @EnableConfigurationProperties({ThreadsBrowserCollectorProperties.class, ThreadsCollectionProperties.class})
@@ -33,6 +35,7 @@ public class ThreadsBrowserCollector implements ThreadsCollector {
     private final ThreadsCollectionProperties collectionProperties;
     private final ThreadsCollectionSleeper sleeper;
     private final Clock clock;
+    private final ThreadsPostDateResolver postDateResolver = new ThreadsPostDateResolver();
 
     @Autowired
     public ThreadsBrowserCollector(
@@ -92,6 +95,7 @@ public class ThreadsBrowserCollector implements ThreadsCollector {
         }
 
         List<ThreadsCollectedPost> posts = parser.parse(snapshot.rawContent()).stream()
+                .sorted(this::compareByPublishedAtDesc)
                 .limit(postLimit)
                 .map(parsedPost -> toCollectedPost(request, parsedPost))
                 .toList();
@@ -120,7 +124,13 @@ public class ThreadsBrowserCollector implements ThreadsCollector {
 
     private ThreadsCollectedPost toCollectedPost(ThreadsCollectionRequest request, ThreadsParsedPost parsedPost) {
         String rawUrl = parsedPost.postUrl() == null ? request.source().getUrl() : parsedPost.postUrl();
-        return new ThreadsCollectedPost(rawUrl, parsedPost.rawContent(), LocalDateTime.now(clock));
+        LocalDateTime collectedAt = LocalDateTime.now(clock);
+        return new ThreadsCollectedPost(
+                rawUrl,
+                parsedPost.rawContent(),
+                resolvePublishedAt(parsedPost).orElse(collectedAt),
+                collectedAt
+        );
     }
 
     private int postLimit(ThreadsCollectionRequest request) {
@@ -132,10 +142,7 @@ public class ThreadsBrowserCollector implements ThreadsCollector {
     }
 
     private int normalizedMaxScrollCount(ThreadsCollectionRequest request) {
-        if (request.maxScrollCount() > 0) {
-            return request.maxScrollCount();
-        }
-        return Math.max(0, properties.getMaxScrollCount());
+        return Math.max(0, request.maxScrollCount());
     }
 
     private void delayBetweenScrolls(int maxScrollCount) {
@@ -143,6 +150,24 @@ public class ThreadsBrowserCollector implements ThreadsCollector {
         for (int index = 1; index <= maxScrollCount; index++) {
             sleeper.sleep(delay);
         }
+    }
+
+    private int compareByPublishedAtDesc(ThreadsParsedPost left, ThreadsParsedPost right) {
+        Optional<LocalDateTime> leftPublishedAt = resolvePublishedAt(left);
+        Optional<LocalDateTime> rightPublishedAt = resolvePublishedAt(right);
+        if (leftPublishedAt.isPresent() && rightPublishedAt.isPresent()) {
+            return rightPublishedAt.get().compareTo(leftPublishedAt.get());
+        }
+        if (leftPublishedAt.isPresent()) {
+            return -1;
+        }
+        if (rightPublishedAt.isPresent()) {
+            return 1;
+        }
+        return 0;
+    }
+    private Optional<LocalDateTime> resolvePublishedAt(ThreadsParsedPost parsedPost) {
+        return postDateResolver.resolve(parsedPost.displayTime(), clock);
     }
 
     private static ThreadsCollectionStatus toCollectionStatus(ThreadsBrowserPageStatus status) {

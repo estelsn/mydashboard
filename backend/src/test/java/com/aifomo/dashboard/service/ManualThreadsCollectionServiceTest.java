@@ -57,9 +57,9 @@ class ManualThreadsCollectionServiceTest {
     void setUp() {
         properties = new ThreadsCollectionProperties();
         properties.getDefaults().setMaxPostsPerAccount(3);
-        properties.getDefaults().setMaxScrollCount(1);
+        properties.getDefaults().setMaxScrollCount(0);
         properties.getLimits().setMaxPostsPerAccount(5);
-        properties.getLimits().setMaxScrollCount(2);
+        properties.getLimits().setMaxScrollCount(0);
         properties.getSafety().setDelayBetweenAccounts(Duration.ofSeconds(5));
         properties.getSafety().setMinSourceRecollectionInterval(Duration.ofHours(1));
         sleeper = new CapturingSleeper();
@@ -77,12 +77,12 @@ class ManualThreadsCollectionServiceTest {
         assertThat(collector.requests).singleElement()
                 .satisfies(request -> {
                     assertThat(request.maxItems()).isEqualTo(5);
-                    assertThat(request.maxScrollCount()).isEqualTo(2);
+                    assertThat(request.maxScrollCount()).isZero();
                 });
         assertThat(response.requestedMaxPostsPerAccount()).isEqualTo(100);
         assertThat(response.appliedMaxPostsPerAccount()).isEqualTo(5);
         assertThat(response.requestedMaxScrollCount()).isEqualTo(50);
-        assertThat(response.appliedMaxScrollCount()).isEqualTo(2);
+        assertThat(response.appliedMaxScrollCount()).isZero();
     }
 
     @Test
@@ -102,7 +102,7 @@ class ManualThreadsCollectionServiceTest {
     void stopsImmediatelyWhenLoginRequired() {
         assertStopsOnRiskStatus(
                 ThreadsCollectionStatus.LOGIN_REQUIRED,
-                "Stopped because Threads session status was LOGIN_REQUIRED."
+                "Threads 로그인이 필요해 수집을 중단했습니다."
         );
     }
 
@@ -110,7 +110,7 @@ class ManualThreadsCollectionServiceTest {
     void stopsImmediatelyWhenAccessRestricted() {
         assertStopsOnRiskStatus(
                 ThreadsCollectionStatus.ACCESS_RESTRICTED,
-                "Stopped because Threads access appeared restricted."
+                "접근 제한이 감지되어 수집을 중단했습니다."
         );
     }
 
@@ -118,8 +118,53 @@ class ManualThreadsCollectionServiceTest {
     void stopsImmediatelyWhenTimedOut() {
         assertStopsOnRiskStatus(
                 ThreadsCollectionStatus.TIMEOUT,
-                "Stopped because Threads collection timed out."
+                "시간 초과로 수집을 중단했습니다."
         );
+    }
+
+    @Test
+    void collectsOnlyPostsFromLastThreeDaysAcrossEnabledSources() {
+        sourceRepository.save(new Source(
+                "First Threads",
+                SourceType.THREADS_ACCOUNT,
+                SourceCategory.NEWS,
+                "https://www.threads.com/@first",
+                "first",
+                true,
+                10
+        ));
+        sourceRepository.save(new Source(
+                "Second Threads",
+                SourceType.THREADS_ACCOUNT,
+                SourceCategory.NEWS,
+                "https://www.threads.com/@second",
+                "second",
+                true,
+                20
+        ));
+        CapturingThreadsCollector collector = collector(request -> new ThreadsCollectionResult(
+                request.source(),
+                List.of(
+                        new ThreadsCollectedPost(
+                                request.source().getUrl() + "/post/new",
+                                request.source().getName() + " new",
+                                NOW.minusDays(1),
+                                NOW
+                        ),
+                        new ThreadsCollectedPost(request.source().getUrl() + "/post/old", "old", NOW.minusDays(4), NOW)
+                ),
+                List.of()
+        ));
+
+        ManualThreadsCollectionResponse response = service(collector).collectRecentFromEnabledSources();
+
+        assertThat(response.status().name()).isEqualTo("SUCCEEDED");
+        assertThat(response.collectedCount()).isEqualTo(2);
+        assertThat(response.createdCount()).isEqualTo(2);
+        assertThat(response.safetyMessage()).contains("최근 3일 필터");
+        assertThat(infoItemRepository.findAll()).allSatisfy(infoItem ->
+                assertThat(infoItem.getPublishedAt()).isAfterOrEqualTo(NOW.minusDays(3)));
+        assertThat(sleeper.durations).containsExactly(Duration.ofSeconds(5));
     }
 
     @Test
@@ -144,7 +189,7 @@ class ManualThreadsCollectionServiceTest {
 
         assertThat(collector.requests).isEmpty();
         assertThat(response.status().name()).isEqualTo("SUCCEEDED");
-        assertThat(response.safetyMessage()).contains("COOLDOWN_SKIPPED");
+        assertThat(response.safetyMessage()).contains("최근에 수집한 소스라 건너뛰었습니다.");
         assertThat(response.safetyMessage()).contains("2026-05-05T12:30");
         assertThat(collectedItemRepository.findAll()).isEmpty();
         assertThat(infoItemRepository.findAll()).isEmpty();
@@ -165,7 +210,7 @@ class ManualThreadsCollectionServiceTest {
         assertThat(collector.requests).hasSize(1);
         assertThat(sleeper.durations).isEmpty();
         assertThat(response.status().name()).isEqualTo("FAILED");
-        assertThat(response.failureReason()).contains("status=" + status);
+        assertThat(response.failureReason()).contains("상태=" + status);
         assertThat(response.safetyMessage()).isEqualTo(safetyMessage);
     }
 
@@ -197,7 +242,7 @@ class ManualThreadsCollectionServiceTest {
     private ThreadsCollectionResult success(Source source, String content) {
         return new ThreadsCollectionResult(
                 source,
-                List.of(new ThreadsCollectedPost(source.getUrl() + "/post/1", content, NOW)),
+                List.of(new ThreadsCollectedPost(source.getUrl() + "/post/1", content, NOW, NOW)),
                 List.of()
         );
     }

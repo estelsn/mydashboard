@@ -24,12 +24,24 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Locale;
+import java.util.regex.Pattern;
 
 @Service
 public class ThreadsCollectionPersistenceService {
 
     private static final int TITLE_LIMIT = 120;
     private static final int SUMMARY_LIMIT = 500;
+    private static final Pattern URL_PATTERN = Pattern.compile("https?://\\S+");
+    private static final Pattern RELATIVE_TIME_PATTERN = Pattern.compile(
+            "\\b(\\d+\\s*(s|sec|secs|second|seconds|m|min|mins|minute|minutes|h|hr|hrs|hour|hours|d|day|days|w|wk|wks|week|weeks)|yesterday)\\b",
+            Pattern.CASE_INSENSITIVE
+    );
+    private static final Pattern KOREAN_RELATIVE_TIME_PATTERN = Pattern.compile("(\\d+\\s*(초|분|시간|일|주)|어제)");
+    private static final Pattern ABSOLUTE_DATE_PATTERN = Pattern.compile(
+            "\\b(\\d{4}[-/.]\\d{1,2}[-/.]\\d{1,2}(?:[ t]\\d{1,2}:\\d{2}(?::\\d{2})?)?|[a-z]{3,9}\\s+\\d{1,2}|\\d{1,2}월\\s*\\d{1,2}일)\\b",
+            Pattern.CASE_INSENSITIVE
+    );
 
     private final CollectionRunRepository collectionRunRepository;
     private final CollectedItemRepository collectedItemRepository;
@@ -68,7 +80,7 @@ public class ThreadsCollectionPersistenceService {
                 0,
                 startedAt,
                 null,
-                "Threads collection persistence started"
+                "Threads 수집 저장을 시작했습니다."
         ));
         return persist(run, List.of(result));
     }
@@ -159,8 +171,8 @@ public class ThreadsCollectionPersistenceService {
         for (ThreadsCollectedPost post : posts) {
             try {
                 String normalizedContent = ContentHashUtil.normalize(post.rawContent());
-                String contentHash = ContentHashUtil.sha256Normalized(post.rawContent());
-                if (collectedItemRepository.findByContentHash(contentHash).isPresent()) {
+                String contentHash = stableContentHash(post);
+                if (isDuplicate(post, contentHash)) {
                     duplicateCount++;
                     continue;
                 }
@@ -184,6 +196,27 @@ public class ThreadsCollectionPersistenceService {
         return new PersistCounts(createdCount, duplicateCount, failedCount, failures);
     }
 
+    private boolean isDuplicate(ThreadsCollectedPost post, String contentHash) {
+        return collectedItemRepository.findByContentHash(contentHash).isPresent()
+                || collectedItemRepository.findByRawUrl(post.rawUrl()).isPresent();
+    }
+
+    private String stableContentHash(ThreadsCollectedPost post) {
+        return ContentHashUtil.sha256Normalized(canonicalDuplicateKey(post));
+    }
+
+    private String canonicalDuplicateKey(ThreadsCollectedPost post) {
+        String withoutUrls = URL_PATTERN.matcher(post.rawContent()).replaceAll(" ");
+        String withoutRelativeTime = RELATIVE_TIME_PATTERN.matcher(withoutUrls).replaceAll(" ");
+        String withoutKoreanRelativeTime = KOREAN_RELATIVE_TIME_PATTERN.matcher(withoutRelativeTime).replaceAll(" ");
+        String withoutAbsoluteDate = ABSOLUTE_DATE_PATTERN.matcher(withoutKoreanRelativeTime).replaceAll(" ");
+        String normalized = ContentHashUtil.normalize(withoutAbsoluteDate);
+        if (normalized.isBlank() && post.rawUrl() != null) {
+            return post.rawUrl().toLowerCase(Locale.ROOT);
+        }
+        return normalized;
+    }
+
     private InfoItem toInfoItem(Source source, CollectedItem collectedItem, ThreadsCollectedPost post, String normalizedContent) {
         return new InfoItem(
                 source,
@@ -200,7 +233,7 @@ public class ThreadsCollectionPersistenceService {
                 false,
                 null,
                 false,
-                post.collectedAt(),
+                post.publishedAt() == null ? post.collectedAt() : post.publishedAt(),
                 post.collectedAt()
         );
     }
@@ -208,18 +241,20 @@ public class ThreadsCollectionPersistenceService {
     private String statusMessage(ThreadsCollectionResult result, PersistCounts counts) {
         String message = "Threads collection persisted: collected=%d, created=%d, duplicate=%d, failed=%d"
                 .formatted(result.posts().size(), counts.createdCount(), counts.duplicateCount(), counts.failedCount());
+        message = "Threads 수집 저장 완료: 수집 %d, 생성 %d, 중복 %d, 실패 %d"
+                .formatted(result.posts().size(), counts.createdCount(), counts.duplicateCount(), counts.failedCount());
         if (result.warnings().isEmpty()) {
             return message;
         }
-        return message + "; warnings=" + String.join("; ", result.warnings());
+        return message + "; 안내=" + String.join("; ", result.warnings());
     }
 
     private String statusMessage(ThreadsCollectionResult result) {
-        String message = "Threads collection failed: status=" + result.status();
+        String message = "Threads 수집 실패: 상태=" + result.status();
         if (result.warnings().isEmpty()) {
             return message;
         }
-        return message + "; warnings=" + String.join("; ", result.warnings());
+        return message + "; 안내=" + String.join("; ", result.warnings());
     }
 
     private String truncate(String value, int limit) {

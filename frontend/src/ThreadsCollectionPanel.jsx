@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { collectThreads, fetchCollectionRuns } from './api/dashboardApi';
+import { collectRecentThreads, collectThreads, fetchCollectionRuns } from './api/dashboardApi';
 import { StateMessage, StatusBadge, formatDateTime } from './ui';
 
 const runStatusLabels = {
@@ -26,12 +26,13 @@ const safetyStatusMessages = {
 export function ThreadsCollectionPanel({ onDashboardRefresh }) {
   const [accountUrl, setAccountUrl] = useState('');
   const [maxPostsPerAccount, setMaxPostsPerAccount] = useState(3);
-  const [maxScrollCount, setMaxScrollCount] = useState(1);
   const [runs, setRuns] = useState([]);
   const [loadingRuns, setLoadingRuns] = useState(true);
   const [collecting, setCollecting] = useState(false);
+  const [collectingRecent, setCollectingRecent] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
+  const busy = collecting || collectingRecent;
 
   async function refreshRuns() {
     setLoadingRuns(true);
@@ -62,7 +63,7 @@ export function ThreadsCollectionPanel({ onDashboardRefresh }) {
       const response = await collectThreads({
         accountUrls: [trimmedUrl],
         maxPostsPerAccount: Number(maxPostsPerAccount),
-        maxScrollCount: Number(maxScrollCount),
+        maxScrollCount: 0,
       });
 
       setResult(response);
@@ -71,6 +72,22 @@ export function ThreadsCollectionPanel({ onDashboardRefresh }) {
       setError(nextError.message);
     } finally {
       setCollecting(false);
+    }
+  }
+
+  async function handleCollectRecent() {
+    setCollectingRecent(true);
+    setError('');
+    setResult(null);
+
+    try {
+      const response = await collectRecentThreads();
+      setResult(response);
+      await Promise.all([refreshRuns(), onDashboardRefresh?.()]);
+    } catch (nextError) {
+      setError(nextError.message);
+    } finally {
+      setCollectingRecent(false);
     }
   }
 
@@ -105,6 +122,22 @@ export function ThreadsCollectionPanel({ onDashboardRefresh }) {
     };
   }, []);
 
+  useEffect(() => {
+    if (!busy) {
+      return undefined;
+    }
+
+    const intervalId = window.setInterval(() => {
+      refreshRuns();
+    }, 1500);
+
+    refreshRuns();
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [busy]);
+
   return (
     <section className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(320px,420px)]">
@@ -112,9 +145,29 @@ export function ThreadsCollectionPanel({ onDashboardRefresh }) {
           <div>
             <h2 className="text-base font-semibold text-slate-950">Threads 수동 수집</h2>
             <p className="mt-1 text-sm text-slate-600">
-              Threads 수집은 계정 보호를 위해 낮은 기본값과 대기 시간을 적용합니다. 로그인 필요,
-              접근 제한, 시간 초과가 감지되면 수집을 즉시 중단합니다.
+              Threads 수집은 계정 보호를 위해 낮은 기본값을 적용합니다. 현재 구조에서는 게시물 날짜를
+              기준으로 최신순 정렬 후 상위 결과만 저장합니다.
             </p>
+          </div>
+
+          <div className="rounded-md border border-teal-100 bg-teal-50/70 p-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-semibold text-teal-900">활성 소스 최근 3일 수집</p>
+                <p className="mt-1 text-sm text-teal-800">
+                  클릭 시점 기준 최근 3일 게시물만 수집합니다. 활성 Threads 소스를 순차 실행하고 계정 간
+                  대기 시간을 둡니다.
+                </p>
+              </div>
+              <button
+                className="w-fit rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-50"
+                type="button"
+                disabled={busy}
+                onClick={handleCollectRecent}
+              >
+                {collectingRecent ? '최근 3일 수집 중' : '최근 3일 수집'}
+              </button>
+            </div>
           </div>
 
           <label className="flex flex-col gap-1.5 text-sm font-medium text-slate-700">
@@ -128,35 +181,22 @@ export function ThreadsCollectionPanel({ onDashboardRefresh }) {
             />
           </label>
 
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className="flex flex-col gap-1.5 text-sm font-medium text-slate-700">
-              계정당 최대 게시물
-              <input
-                className="rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-950 shadow-sm outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
-                type="number"
-                min="1"
-                max="5"
-                value={maxPostsPerAccount}
-                onChange={(event) => setMaxPostsPerAccount(event.target.value)}
-              />
-            </label>
-            <label className="flex flex-col gap-1.5 text-sm font-medium text-slate-700">
-              최대 스크롤
-              <input
-                className="rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-950 shadow-sm outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
-                type="number"
-                min="0"
-                max="2"
-                value={maxScrollCount}
-                onChange={(event) => setMaxScrollCount(event.target.value)}
-              />
-            </label>
-          </div>
+          <label className="flex max-w-xs flex-col gap-1.5 text-sm font-medium text-slate-700">
+            계정당 최대 게시물
+            <input
+              className="rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-950 shadow-sm outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
+              type="number"
+              min="1"
+              max="5"
+              value={maxPostsPerAccount}
+              onChange={(event) => setMaxPostsPerAccount(event.target.value)}
+            />
+          </label>
 
           <button
             className="w-fit rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-50"
             type="submit"
-            disabled={collecting}
+            disabled={busy}
           >
             {collecting ? '수집 실행 중' : '수집 실행'}
           </button>
@@ -196,9 +236,15 @@ export function ThreadsCollectionPanel({ onDashboardRefresh }) {
         </StateMessage>
       ) : null}
 
+      {busy ? (
+        <StateMessage tone="loading" className="mt-4">
+          {collectingRecent ? '최근 3일 수집을 진행 중입니다.' : '수동 수집을 진행 중입니다.'}
+        </StateMessage>
+      ) : null}
+
       {error ? (
         <StateMessage tone="error" className="mt-4">
-          Threads 수집 API를 호출하지 못했습니다. {error}
+          수집 API를 호출하지 못했습니다. {error}
         </StateMessage>
       ) : null}
     </section>
@@ -211,7 +257,7 @@ function SafetyResultMessage({ result }) {
   )?.[1];
   const appliedMessage =
     result.requestedMaxPostsPerAccount && result.appliedMaxPostsPerAccount
-      ? `적용 제한: 계정당 게시물 ${result.appliedMaxPostsPerAccount}/${result.requestedMaxPostsPerAccount}, 스크롤 ${result.appliedMaxScrollCount}/${result.requestedMaxScrollCount}`
+      ? `적용 제한: 계정당 게시물 ${result.appliedMaxPostsPerAccount}/${result.requestedMaxPostsPerAccount}`
       : '';
 
   return (
@@ -231,12 +277,15 @@ function CollectionRunRow({ run }) {
     <article className="rounded-md border border-slate-200 px-3 py-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <StatusBadge tone={statusTone}>{statusLabel}</StatusBadge>
-        <span className="text-xs text-slate-500">Run #{run.id}</span>
+        <span className="text-xs text-slate-500">실행 #{run.id}</span>
       </div>
       <p className="mt-2 text-sm text-slate-700">
         수집 {run.collectedItemCount}, 생성 {run.createdCount}, 중복 {run.duplicateCount}, 실패{' '}
         {run.failedCount}
       </p>
+      {run.statusMessage ? (
+        <p className="mt-1 text-sm text-slate-600">{run.statusMessage}</p>
+      ) : null}
       <p className="mt-1 text-xs text-slate-500">
         생성 {formatDateTime(run.createdAt)} · 갱신 {formatDateTime(run.updatedAt)}
       </p>

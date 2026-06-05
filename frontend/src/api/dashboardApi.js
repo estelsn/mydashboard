@@ -76,6 +76,12 @@ export function collectThreads({ accountUrls, maxPostsPerAccount, maxScrollCount
   });
 }
 
+export function collectRecentThreads() {
+  return requestJson('/api/collection-runs/threads/recent', {
+    method: 'POST',
+  });
+}
+
 export function fetchSources() {
   return requestJson('/api/sources');
 }

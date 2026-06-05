@@ -110,6 +110,7 @@ class ThreadsCollectionRequestTest {
         posts.add(new ThreadsCollectedPost(
                 "https://www.threads.com/@choi.openai/post/seed-001",
                 "Post content",
+                LocalDateTime.of(2026, 5, 1, 9, 30),
                 LocalDateTime.of(2026, 5, 1, 10, 0)
         ));
 

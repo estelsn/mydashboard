@@ -127,6 +127,34 @@ class ThreadsBrowserCollectorTest {
         assertThat(result.warnings()).containsExactly("Threads snapshot did not contain collectable posts");
     }
 
+    @Test
+    void sortsParsedPostsByResolvedPublishedDateBeforeApplyingLimit() {
+        ThreadsBrowserCollectorProperties properties = new ThreadsBrowserCollectorProperties();
+        properties.setMaxPostsPerAccount(1);
+
+        var collector = collector(
+                readySession(),
+                new CapturingPageClient(ThreadsBrowserPageSnapshot.success("""
+                        <article data-threads-post data-author="@choi.openai" data-url="https://www.threads.com/@choi.openai/post/old" data-time="May 5">
+                          <div>Older pinned post</div>
+                        </article>
+                        <article data-threads-post data-author="@choi.openai" data-url="https://www.threads.com/@choi.openai/post/new" data-time="3h">
+                          <div>Newest post</div>
+                        </article>
+                        """)),
+                properties
+        );
+
+        var result = collector.collect(new ThreadsCollectionRequest(source(), 1));
+
+        assertThat(result.status()).isEqualTo(ThreadsCollectionStatus.SUCCESS);
+        assertThat(result.posts()).singleElement().satisfies(post -> {
+            assertThat(post.rawUrl()).isEqualTo("https://www.threads.com/@choi.openai/post/new");
+            assertThat(post.publishedAt()).isEqualTo(LocalDateTime.of(2026, 5, 5, 9, 0));
+            assertThat(post.collectedAt()).isEqualTo(LocalDateTime.of(2026, 5, 5, 12, 0));
+        });
+    }
+
     private ThreadsBrowserCollector collector(
             BrowserSessionProvider sessionProvider,
             ThreadsBrowserPageClient pageClient,

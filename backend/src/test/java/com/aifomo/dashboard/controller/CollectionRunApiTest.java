@@ -84,6 +84,7 @@ class CollectionRunApiTest {
             return new ThreadsCollectionResult(request.source(), List.of(new ThreadsCollectedPost(
                     "https://www.threads.net/@example/post/1",
                     "New Threads AI update",
+                    LocalDateTime.of(2026, 5, 5, 11, 0),
                     LocalDateTime.of(2026, 5, 5, 12, 0)
             )), List.of());
         });
@@ -105,6 +106,28 @@ class CollectionRunApiTest {
                 .andExpect(jsonPath("$.duplicateCount").value(0))
                 .andExpect(jsonPath("$.failedCount").value(0))
                 .andExpect(jsonPath("$.failureReason").doesNotExist());
+    }
+
+    @Test
+    void runsRecentThreadsCollectionForEnabledSources() throws Exception {
+        when(threadsCollector.collect(any())).thenAnswer(invocation -> {
+            var request = invocation.getArgument(0, com.aifomo.dashboard.collector.threads.ThreadsCollectionRequest.class);
+            return new ThreadsCollectionResult(request.source(), List.of(new ThreadsCollectedPost(
+                    request.source().getUrl() + "/post/1",
+                    "New Threads AI update",
+                    LocalDateTime.of(2026, 5, 5, 11, 0),
+                    LocalDateTime.of(2026, 5, 5, 12, 0)
+            )), List.of());
+        });
+
+        mockMvc.perform(post("/api/collection-runs/threads/recent"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.runId").isNumber())
+                .andExpect(jsonPath("$.status").value("SUCCEEDED"))
+                .andExpect(jsonPath("$.collectedCount").exists())
+                .andExpect(jsonPath("$.createdCount").exists())
+                .andExpect(jsonPath("$.duplicateCount").exists())
+                .andExpect(jsonPath("$.safetyMessage").value(org.hamcrest.Matchers.containsString("최근 3일 필터")));
     }
 
     @Test

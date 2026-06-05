@@ -72,6 +72,7 @@ class ThreadsCollectionPersistenceServiceTest {
         ThreadsCollectedPost post = new ThreadsCollectedPost(
                 "https://www.threads.com/@choi.openai/post/1",
                 "  OpenAI   coding agent update\nships today.  ",
+                COLLECTED_AT.minusMinutes(30),
                 COLLECTED_AT
         );
 
@@ -89,7 +90,8 @@ class ThreadsCollectionPersistenceServiceTest {
         assertThat(collectedItem.getSource().getId()).isEqualTo(source.getId());
         assertThat(collectedItem.getRawUrl()).isEqualTo(post.rawUrl());
         assertThat(collectedItem.getRawContent()).isEqualTo(post.rawContent());
-        assertThat(collectedItem.getContentHash()).isEqualTo(ContentHashUtil.sha256Normalized(post.rawContent()));
+        assertThat(collectedItem.getContentHash())
+                .isEqualTo(ContentHashUtil.sha256Normalized("OpenAI coding agent update ships today."));
         assertThat(collectedItem.getStatus()).isEqualTo(CollectedItemStatus.COLLECTED);
 
         assertThat(infoItemRepository.findAll()).singleElement()
@@ -100,6 +102,8 @@ class ThreadsCollectionPersistenceServiceTest {
                     assertThat(infoItem.getDecisionStatus()).isEqualTo(DecisionStatus.UNREVIEWED);
                     assertThat(infoItem.isHidden()).isFalse();
                     assertThat(infoItem.isDuplicate()).isFalse();
+                    assertThat(infoItem.getPublishedAt()).isEqualTo(COLLECTED_AT.minusMinutes(30));
+                    assertThat(infoItem.getCollectedAt()).isEqualTo(COLLECTED_AT);
                 });
     }
 
@@ -108,11 +112,13 @@ class ThreadsCollectionPersistenceServiceTest {
         ThreadsCollectedPost first = new ThreadsCollectedPost(
                 "https://www.threads.com/@choi.openai/post/1",
                 "OpenAI coding agent update ships today.",
+                COLLECTED_AT.minusMinutes(5),
                 COLLECTED_AT
         );
         ThreadsCollectedPost duplicate = new ThreadsCollectedPost(
                 "https://www.threads.com/@choi.openai/post/2",
                 " openai   coding agent update ships today. ",
+                COLLECTED_AT.minusMinutes(4),
                 COLLECTED_AT.plusMinutes(1)
         );
 
@@ -124,6 +130,30 @@ class ThreadsCollectionPersistenceServiceTest {
         assertThat(duplicateRun.getCreatedCount()).isZero();
         assertThat(duplicateRun.getDuplicateCount()).isEqualTo(1);
         assertThat(duplicateRun.getFailedCount()).isZero();
+        assertThat(collectedItemRepository.findAll()).hasSize(1);
+        assertThat(infoItemRepository.findAll()).hasSize(1);
+    }
+
+    @Test
+    void treatsSamePostUrlAsDuplicateEvenWhenRelativeTimeStringChanges() {
+        ThreadsCollectedPost first = new ThreadsCollectedPost(
+                "https://www.threads.com/@choi.openai/post/1",
+                "@choi.openai\nSame post body\nhttps://www.threads.com/@choi.openai/post/1\n3h",
+                COLLECTED_AT.minusHours(3),
+                COLLECTED_AT
+        );
+        ThreadsCollectedPost duplicate = new ThreadsCollectedPost(
+                "https://www.threads.com/@choi.openai/post/1",
+                "@choi.openai\nSame post body\nhttps://www.threads.com/@choi.openai/post/1\n1d",
+                COLLECTED_AT.minusDays(1),
+                COLLECTED_AT.plusDays(1)
+        );
+
+        service.persist(new ThreadsCollectionResult(source, List.of(first), List.of()));
+        CollectionRun duplicateRun = service.persist(new ThreadsCollectionResult(source, List.of(duplicate), List.of()));
+
+        assertThat(duplicateRun.getCreatedCount()).isZero();
+        assertThat(duplicateRun.getDuplicateCount()).isEqualTo(1);
         assertThat(collectedItemRepository.findAll()).hasSize(1);
         assertThat(infoItemRepository.findAll()).hasSize(1);
     }

@@ -32,8 +32,8 @@ public class InfoItemService {
     @Transactional(readOnly = true)
     public List<InfoItemResponse> findAll(boolean includeHidden) {
         List<InfoItem> infoItems = includeHidden
-                ? infoItemRepository.findByIsDeletedFalseOrderByCollectedAtDesc()
-                : infoItemRepository.findByIsDeletedFalseAndIsHiddenFalseAndDecisionStatusNotInOrderByCollectedAtDesc(DEFAULT_HIDDEN_STATUSES);
+                ? infoItemRepository.findByIsDeletedFalseOrderByPublishedAtDescCollectedAtDesc()
+                : infoItemRepository.findVisibleByDecisionStatusNotInOrderByPublishedAtDescCollectedAtDesc(DEFAULT_HIDDEN_STATUSES);
 
         return infoItems.stream()
                 .map(this::toResponse)
@@ -83,7 +83,7 @@ public class InfoItemService {
         long hiddenCount = infoItemRepository.countByIsDeletedFalseAndIsHiddenTrue();
         long ignoreCount = infoItemRepository.countByIsDeletedFalseAndDecisionStatus(DecisionStatus.IGNORE);
         long archiveCandidateCount = infoItemRepository.countByIsDeletedFalseAndDecisionStatus(DecisionStatus.ARCHIVE_CANDIDATE);
-        long visibleCount = infoItemRepository.findByIsDeletedFalseAndIsHiddenFalseAndDecisionStatusNotInOrderByCollectedAtDesc(DEFAULT_HIDDEN_STATUSES).size();
+        long visibleCount = infoItemRepository.findVisibleByDecisionStatusNotInOrderByPublishedAtDescCollectedAtDesc(DEFAULT_HIDDEN_STATUSES).size();
 
         return new DashboardSummaryResponse(
                 totalCount,

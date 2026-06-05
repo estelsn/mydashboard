@@ -8,4 +8,6 @@ import java.util.Optional;
 public interface CollectedItemRepository extends JpaRepository<CollectedItem, Long> {
 
     Optional<CollectedItem> findByContentHash(String contentHash);
+
+    Optional<CollectedItem> findByRawUrl(String rawUrl);
 }

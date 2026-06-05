@@ -32,4 +32,9 @@ public class CollectionRunController {
     public ManualThreadsCollectionResponse collectThreads(@Valid @RequestBody ManualThreadsCollectionRequest request) {
         return manualThreadsCollectionService.collect(request);
     }
+
+    @PostMapping("/threads/recent")
+    public ManualThreadsCollectionResponse collectRecentThreads() {
+        return manualThreadsCollectionService.collectRecentFromEnabledSources();
+    }
 }

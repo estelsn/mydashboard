@@ -6,6 +6,7 @@ import java.util.Objects;
 public record ThreadsCollectedPost(
         String rawUrl,
         String rawContent,
+        LocalDateTime publishedAt,
         LocalDateTime collectedAt
 ) {
 

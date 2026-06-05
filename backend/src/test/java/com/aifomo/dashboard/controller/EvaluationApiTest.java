@@ -1,11 +1,18 @@
 package com.aifomo.dashboard.controller;
 
+import com.aifomo.dashboard.domain.collected.CollectedItem;
+import com.aifomo.dashboard.domain.collected.CollectedItemStatus;
 import com.aifomo.dashboard.domain.evaluation.EvaluatorType;
 import com.aifomo.dashboard.domain.info.DecisionStatus;
 import com.aifomo.dashboard.domain.info.InfoItem;
+import com.aifomo.dashboard.domain.info.ImportanceLevel;
+import com.aifomo.dashboard.domain.source.Source;
+import com.aifomo.dashboard.repository.CollectedItemRepository;
 import com.aifomo.dashboard.repository.EvaluationRepository;
 import com.aifomo.dashboard.repository.InfoItemRepository;
+import com.aifomo.dashboard.repository.SourceRepository;
 import com.aifomo.dashboard.service.RuleBasedEvaluator;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -38,7 +45,42 @@ class EvaluationApiTest {
     private InfoItemRepository infoItemRepository;
 
     @Autowired
+    private CollectedItemRepository collectedItemRepository;
+
+    @Autowired
+    private SourceRepository sourceRepository;
+
+    @Autowired
     private EvaluationRepository evaluationRepository;
+
+    @BeforeEach
+    void setUp() {
+        evaluationRepository.deleteAll();
+        infoItemRepository.deleteAll();
+        collectedItemRepository.deleteAll();
+
+        Source codexSource = sourceRepository.findAllByOrderByPriorityAscIdAsc().stream()
+                .filter(source -> source.getName().equals("Appcast"))
+                .findFirst()
+                .orElseThrow();
+        Source newsSource = sourceRepository.findAllByOrderByPriorityAscIdAsc().stream()
+                .filter(source -> source.getName().equals("Choi OpenAI"))
+                .findFirst()
+                .orElseThrow();
+
+        createInfoItem(
+                codexSource,
+                "Codex workflow setup",
+                "Codex workflow update shows a practical agent setup for code review and verification in a local project.",
+                DecisionStatus.UNREVIEWED
+        );
+        createInfoItem(
+                newsSource,
+                "OpenAI model update for tool use",
+                "OpenAI announced a new model update with better tool use and lower latency for coding assistance.",
+                DecisionStatus.UNREVIEWED
+        );
+    }
 
     @Test
     void recalculatesInfoItemThroughEvaluationPipeline() throws Exception {
@@ -100,5 +142,35 @@ class EvaluationApiTest {
                 .filter(evaluation -> evaluation.getEvaluatorType() == EvaluatorType.MANUAL)
                 .anyMatch(evaluation -> evaluation.getDecisionStatus() == DecisionStatus.APPLY))
                 .isTrue();
+    }
+
+    private void createInfoItem(Source source, String title, String summary, DecisionStatus decisionStatus) {
+        String slug = title.toLowerCase().replace(" ", "-");
+        CollectedItem collectedItem = collectedItemRepository.save(new CollectedItem(
+                source,
+                source.getUrl() + "/post/" + slug,
+                summary,
+                source.getId() + "-" + slug,
+                CollectedItemStatus.COLLECTED,
+                java.time.LocalDateTime.of(2026, 5, 5, 12, 0)
+        ));
+        infoItemRepository.save(new InfoItem(
+                source,
+                collectedItem,
+                title,
+                summary,
+                collectedItem.getRawUrl(),
+                source.getCategory(),
+                "[]",
+                ImportanceLevel.MEDIUM,
+                decisionStatus,
+                false,
+                false,
+                false,
+                null,
+                false,
+                java.time.LocalDateTime.of(2026, 5, 5, 11, 0),
+                java.time.LocalDateTime.of(2026, 5, 5, 12, 0)
+        ));
     }
 }

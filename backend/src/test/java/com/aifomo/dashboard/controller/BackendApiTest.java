@@ -1,10 +1,18 @@
 package com.aifomo.dashboard.controller;
 
+import com.aifomo.dashboard.domain.collected.CollectedItem;
+import com.aifomo.dashboard.domain.collected.CollectedItemStatus;
+import com.aifomo.dashboard.domain.evaluation.Evaluation;
+import com.aifomo.dashboard.domain.evaluation.EvaluatorType;
 import com.aifomo.dashboard.domain.info.DecisionStatus;
 import com.aifomo.dashboard.domain.info.InfoItem;
+import com.aifomo.dashboard.domain.info.ImportanceLevel;
 import com.aifomo.dashboard.domain.source.Source;
+import com.aifomo.dashboard.repository.CollectedItemRepository;
+import com.aifomo.dashboard.repository.EvaluationRepository;
 import com.aifomo.dashboard.repository.InfoItemRepository;
 import com.aifomo.dashboard.repository.SourceRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -37,6 +45,50 @@ class BackendApiTest {
 
     @Autowired
     private SourceRepository sourceRepository;
+
+    @Autowired
+    private CollectedItemRepository collectedItemRepository;
+
+    @Autowired
+    private EvaluationRepository evaluationRepository;
+
+    @BeforeEach
+    void setUp() {
+        evaluationRepository.deleteAll();
+        infoItemRepository.deleteAll();
+        collectedItemRepository.deleteAll();
+
+        Source codexSource = sourceRepository.findAllByOrderByPriorityAscIdAsc().stream()
+                .filter(source -> source.getName().equals("Appcast"))
+                .findFirst()
+                .orElseThrow();
+        Source newsSource = sourceRepository.findAllByOrderByPriorityAscIdAsc().stream()
+                .filter(source -> source.getName().equals("Choi OpenAI"))
+                .findFirst()
+                .orElseThrow();
+
+        createInfoItem(
+                codexSource,
+                "Codex workflow setup",
+                "Codex workflow update shows a practical agent setup for code review and verification.",
+                DecisionStatus.APPLY,
+                false
+        );
+        createInfoItem(
+                newsSource,
+                "OpenAI model update for tool use",
+                "OpenAI announced a new model update with better tool use and lower latency.",
+                DecisionStatus.HOLD,
+                false
+        );
+        createInfoItem(
+                newsSource,
+                "Viral AI video examples",
+                "Amazing AI video results are going viral today, follow for more prompts.",
+                DecisionStatus.IGNORE,
+                true
+        );
+    }
 
     @Test
     void exposesSourceList() throws Exception {
@@ -71,7 +123,7 @@ class BackendApiTest {
 
         mockMvc.perform(get("/api/info-items").param("includeHidden", "true"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(12)))
+                .andExpect(jsonPath("$", hasSize(3)))
                 .andExpect(jsonPath("$[0].latestEvaluation").exists());
 
         mockMvc.perform(get("/api/info-items/{id}", infoItem.getId()))
@@ -125,7 +177,7 @@ class BackendApiTest {
     void exposesDashboardSummary() throws Exception {
         mockMvc.perform(get("/api/dashboard/summary"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.totalCount").value(12))
+                .andExpect(jsonPath("$.totalCount").value(3))
                 .andExpect(jsonPath("$.visibleCount", greaterThanOrEqualTo(0)))
                 .andExpect(jsonPath("$.applyCount", greaterThanOrEqualTo(0)))
                 .andExpect(jsonPath("$.holdCount", greaterThanOrEqualTo(0)))
@@ -139,5 +191,51 @@ class BackendApiTest {
                         .header("Access-Control-Request-Method", "GET"))
                 .andExpect(status().isOk())
                 .andExpect(header().string("Access-Control-Allow-Origin", "http://localhost:5173"));
+    }
+
+    private void createInfoItem(
+            Source source,
+            String title,
+            String summary,
+            DecisionStatus decisionStatus,
+            boolean hidden
+    ) {
+        CollectedItem collectedItem = collectedItemRepository.save(new CollectedItem(
+                source,
+                source.getUrl() + "/post/" + title.toLowerCase().replace(" ", "-"),
+                summary,
+                source.getId() + "-" + title.toLowerCase().replace(" ", "-"),
+                CollectedItemStatus.COLLECTED,
+                java.time.LocalDateTime.of(2026, 5, 5, 12, 0)
+        ));
+        InfoItem infoItem = infoItemRepository.save(new InfoItem(
+                source,
+                collectedItem,
+                title,
+                summary,
+                collectedItem.getRawUrl(),
+                source.getCategory(),
+                "[]",
+                ImportanceLevel.MEDIUM,
+                decisionStatus,
+                false,
+                hidden,
+                false,
+                null,
+                false,
+                java.time.LocalDateTime.of(2026, 5, 5, 11, 0),
+                java.time.LocalDateTime.of(2026, 5, 5, 12, 0)
+        ));
+        evaluationRepository.save(new Evaluation(
+                infoItem,
+                decisionStatus,
+                "Initial test evaluation",
+                0.8,
+                0.8,
+                0.7,
+                0.6,
+                EvaluatorType.RULE_BASED_STUB,
+                "test-v1"
+        ));
     }
 }
