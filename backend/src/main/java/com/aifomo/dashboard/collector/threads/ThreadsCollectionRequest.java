@@ -10,11 +10,16 @@ import java.util.Objects;
 public record ThreadsCollectionRequest(
         Source source,
         int maxItems,
-        int maxScrollCount
+        int maxScrollCount,
+        Long runId
 ) {
 
     public ThreadsCollectionRequest(Source source, int maxItems) {
-        this(source, maxItems, 0);
+        this(source, maxItems, 0, null);
+    }
+
+    public ThreadsCollectionRequest(Source source, int maxItems, int maxScrollCount) {
+        this(source, maxItems, maxScrollCount, null);
     }
 
     public ThreadsCollectionRequest {

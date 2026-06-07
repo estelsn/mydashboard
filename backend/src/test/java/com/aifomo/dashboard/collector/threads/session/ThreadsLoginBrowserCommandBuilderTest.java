@@ -20,6 +20,8 @@ class ThreadsLoginBrowserCommandBuilderTest {
         assertThat(command.command()).containsExactly(
                 "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
                 "--user-data-dir=runtime/browser-profiles/threads",
+                "--profile-directory=Default",
+                "--restore-last-session",
                 "--new-window",
                 "https://www.threads.net/"
         );
@@ -37,6 +39,8 @@ class ThreadsLoginBrowserCommandBuilderTest {
         assertThat(command.command()).containsExactly(
                 "/custom/chrome",
                 "--user-data-dir=build/test-runtime/threads profile",
+                "--profile-directory=Default",
+                "--restore-last-session",
                 "--new-window",
                 "https://www.threads.net/@example"
         );

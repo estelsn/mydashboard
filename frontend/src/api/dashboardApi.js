@@ -1,13 +1,14 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '';
 
 async function requestJson(path, options = {}) {
+  const method = options.method ?? 'GET';
   const response = await fetch(`${API_BASE_URL}${path}`, {
     headers: options.body ? { 'Content-Type': 'application/json' } : undefined,
+    cache: method === 'GET' ? 'no-store' : options.cache,
     ...options,
   });
 
   if (!response.ok) {
-    const method = options.method ?? 'GET';
     let detail = '';
 
     try {
@@ -19,6 +20,20 @@ async function requestJson(path, options = {}) {
 
     const suffix = detail ? ` - ${detail}` : '';
     throw new Error(`${method} ${path} failed with HTTP ${response.status}${suffix}`);
+  }
+
+  if (response.status === 204) {
+    return null;
+  }
+
+  const contentLength = response.headers.get('content-length');
+  if (contentLength === '0') {
+    return null;
+  }
+
+  const contentType = response.headers.get('content-type') ?? '';
+  if (!contentType.includes('application/json')) {
+    return null;
   }
 
   return response.json();
@@ -63,6 +78,12 @@ export function openThreadsLoginBrowser() {
 
 export function fetchCollectionRuns() {
   return requestJson('/api/collection-runs');
+}
+
+export function deleteCollectionRun(id) {
+  return requestJson(`/api/collection-runs/${id}`, {
+    method: 'DELETE',
+  });
 }
 
 export function collectThreads({ accountUrls, maxPostsPerAccount, maxScrollCount }) {

@@ -13,6 +13,7 @@ import com.aifomo.dashboard.collector.threads.ThreadsPostParser;
 import com.aifomo.dashboard.collector.threads.session.BrowserSessionDescriptor;
 import com.aifomo.dashboard.collector.threads.session.BrowserSessionProvider;
 import com.aifomo.dashboard.collector.threads.session.BrowserSessionStatus;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -25,6 +26,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 @Component
+@Slf4j
 @EnableConfigurationProperties({ThreadsBrowserCollectorProperties.class, ThreadsCollectionProperties.class})
 public class ThreadsBrowserCollector implements ThreadsCollector {
 
@@ -73,12 +75,25 @@ public class ThreadsBrowserCollector implements ThreadsCollector {
 
         BrowserSessionDescriptor session = sessionProvider.getSession();
         if (session.status() != BrowserSessionStatus.READY) {
+            log.info("Threads collection skipped before fetch: runId={}, account={}, loginRequired={}, sessionStatus={}, userDataDir={}",
+                    request.runId(),
+                    request.source().getUrl(),
+                    session.status() != BrowserSessionStatus.READY,
+                    session.status(),
+                    session.profileDirectory());
             return sessionFailure(request, session);
         }
 
         int postLimit = postLimit(request);
         int maxScrollCount = normalizedMaxScrollCount(request);
-        delayBetweenScrolls(maxScrollCount);
+        log.info("Threads collection start: runId={}, account={}, requestedPostLimit={}, requestedMaxScrollCount={}, appliedPostLimit={}, appliedMaxScrollCount={}, userDataDir={}",
+                request.runId(),
+                request.source().getUrl(),
+                request.maxItems(),
+                request.maxScrollCount(),
+                postLimit,
+                maxScrollCount,
+                session.profileDirectory() == null ? null : session.profileDirectory().toAbsolutePath());
         ThreadsBrowserPageSnapshot snapshot = pageClient.fetch(new ThreadsBrowserPageRequest(
                 request.source().getUrl(),
                 session.profileDirectory(),
@@ -87,6 +102,15 @@ public class ThreadsBrowserCollector implements ThreadsCollector {
                 properties.getTimeout()
         ));
         if (snapshot.status() != ThreadsBrowserPageStatus.SUCCESS) {
+            String failureStage = snapshot.status() == ThreadsBrowserPageStatus.LOGIN_REQUIRED
+                    ? "session-check"
+                    : "page-access";
+            log.warn("Threads collection failed: runId={}, account={}, stage={}, status={}, message={}",
+                    request.runId(),
+                    request.source().getUrl(),
+                    failureStage,
+                    snapshot.status(),
+                    snapshot.message());
             return ThreadsCollectionResult.failure(
                     request.source(),
                     toCollectionStatus(snapshot.status()),
@@ -94,18 +118,44 @@ public class ThreadsBrowserCollector implements ThreadsCollector {
             );
         }
 
-        List<ThreadsCollectedPost> posts = parser.parse(snapshot.rawContent()).stream()
+        List<ThreadsParsedPost> parsedPosts;
+        try {
+            parsedPosts = parser.parse(snapshot.rawContent());
+        } catch (RuntimeException exception) {
+            log.warn("Threads collection failed: runId={}, account={}, stage=parsing, message={}",
+                    request.runId(),
+                    request.source().getUrl(),
+                    exception.getMessage());
+            return ThreadsCollectionResult.failure(
+                    request.source(),
+                    ThreadsCollectionStatus.FAILED,
+                    defaultMessage(exception.getMessage(), "Threads parsing failed")
+            );
+        }
+        log.info("Threads parsing result: runId={}, account={}, parsedCandidateCount={}",
+                request.runId(),
+                request.source().getUrl(),
+                parsedPosts.size());
+
+        List<ThreadsCollectedPost> posts = parsedPosts.stream()
                 .sorted(this::compareByPublishedAtDesc)
                 .limit(postLimit)
                 .map(parsedPost -> toCollectedPost(request, parsedPost))
                 .toList();
         if (posts.isEmpty()) {
+            log.warn("Threads collection failed: runId={}, account={}, stage=parsing, status=EMPTY_RESULT, parsedCandidateCount=0",
+                    request.runId(),
+                    request.source().getUrl());
             return ThreadsCollectionResult.failure(
                     request.source(),
                     ThreadsCollectionStatus.EMPTY_RESULT,
                     "Threads snapshot did not contain collectable posts"
             );
         }
+        log.info("Threads collection success: runId={}, account={}, selectedPostCount={}",
+                request.runId(),
+                request.source().getUrl(),
+                posts.size());
         return new ThreadsCollectionResult(request.source(), ThreadsCollectionStatus.SUCCESS, posts, List.of());
     }
 
@@ -142,14 +192,10 @@ public class ThreadsBrowserCollector implements ThreadsCollector {
     }
 
     private int normalizedMaxScrollCount(ThreadsCollectionRequest request) {
-        return request.maxScrollCount();
-    }
-
-    private void delayBetweenScrolls(int maxScrollCount) {
-        Duration delay = collectionProperties.getSafety().getDelayBetweenScrolls();
-        for (int index = 1; index <= maxScrollCount; index++) {
-            sleeper.sleep(delay);
-        }
+        return Math.min(
+                request.maxScrollCount(),
+                Math.max(0, properties.getMaxScrollCount())
+        );
     }
 
     private int compareByPublishedAtDesc(ThreadsParsedPost left, ThreadsParsedPost right) {

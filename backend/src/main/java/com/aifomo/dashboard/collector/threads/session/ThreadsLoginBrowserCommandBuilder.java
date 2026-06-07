@@ -16,6 +16,7 @@ public class ThreadsLoginBrowserCommandBuilder {
         Path profileDirectory = properties.getProfileDirectory();
         String chromeExecutable = properties.getChromeExecutable();
         String loginUrl = properties.getLoginUrl();
+        String profileName = properties.getProfileName();
 
         if (profileDirectory == null) {
             throw new ThreadsLoginBrowserLaunchException("Threads browser profile directory is not configured");
@@ -26,12 +27,17 @@ public class ThreadsLoginBrowserCommandBuilder {
         if (loginUrl == null || loginUrl.isBlank()) {
             throw new ThreadsLoginBrowserLaunchException("Threads login URL is not configured");
         }
+        if (profileName == null || profileName.isBlank()) {
+            throw new ThreadsLoginBrowserLaunchException("Threads Chrome profile name is not configured");
+        }
 
         Path normalizedProfileDirectory = profileDirectory.normalize();
         return new ThreadsLoginBrowserCommand(
                 List.of(
                         chromeExecutable,
                         "--user-data-dir=" + normalizedProfileDirectory,
+                        "--profile-directory=" + profileName,
+                        "--restore-last-session",
                         "--new-window",
                         loginUrl
                 ),

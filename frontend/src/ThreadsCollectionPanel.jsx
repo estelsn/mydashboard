@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { collectRecentThreads, collectThreads, fetchCollectionRuns } from './api/dashboardApi';
+import { collectRecentThreads, collectThreads, deleteCollectionRun, fetchCollectionRuns } from './api/dashboardApi';
 import { StateMessage, StatusBadge, formatDateTime } from './ui';
 
 const runStatusLabels = {
@@ -26,10 +26,12 @@ const safetyStatusMessages = {
 export function ThreadsCollectionPanel({ onDashboardRefresh }) {
   const [accountUrl, setAccountUrl] = useState('');
   const [maxPostsPerAccount, setMaxPostsPerAccount] = useState(3);
+  const [maxScrollCount, setMaxScrollCount] = useState(5);
   const [runs, setRuns] = useState([]);
   const [loadingRuns, setLoadingRuns] = useState(true);
   const [collecting, setCollecting] = useState(false);
   const [collectingRecent, setCollectingRecent] = useState(false);
+  const [deletingRunIds, setDeletingRunIds] = useState([]);
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
   const busy = collecting || collectingRecent;
@@ -41,8 +43,27 @@ export function ThreadsCollectionPanel({ onDashboardRefresh }) {
     try {
       const nextRuns = await fetchCollectionRuns();
       setRuns(nextRuns);
+      return nextRuns;
     } finally {
       setLoadingRuns(false);
+    }
+  }
+
+  async function handleDeleteRun(runId) {
+    const previousRuns = runs;
+    setRuns((currentRuns) => currentRuns.filter((run) => run.id !== runId));
+    setDeletingRunIds((currentIds) => [...currentIds, runId]);
+    setError('');
+
+    try {
+      await deleteCollectionRun(runId);
+      const nextRuns = await fetchCollectionRuns();
+      setRuns(nextRuns);
+    } catch (nextError) {
+      setRuns(previousRuns);
+      setError(`수집 실행 삭제에 실패했습니다. ${nextError.message}`);
+    } finally {
+      setDeletingRunIds((currentIds) => currentIds.filter((id) => id !== runId));
     }
   }
 
@@ -64,7 +85,7 @@ export function ThreadsCollectionPanel({ onDashboardRefresh }) {
       const response = await collectThreads({
         accountUrls: [trimmedUrl],
         maxPostsPerAccount: Number(maxPostsPerAccount),
-        maxScrollCount: 0,
+        maxScrollCount: Number(maxScrollCount),
       });
 
       setResult(response);
@@ -188,9 +209,21 @@ export function ThreadsCollectionPanel({ onDashboardRefresh }) {
               className="rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-950 shadow-sm outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
               type="number"
               min="1"
-              max="5"
+              max="100"
               value={maxPostsPerAccount}
               onChange={(event) => setMaxPostsPerAccount(event.target.value)}
+            />
+          </label>
+
+          <label className="flex max-w-xs flex-col gap-1.5 text-sm font-medium text-slate-700">
+            최대 스크롤
+            <input
+              className="rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-950 shadow-sm outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
+              type="number"
+              min="0"
+              max="30"
+              value={maxScrollCount}
+              onChange={(event) => setMaxScrollCount(event.target.value)}
             />
           </label>
 
@@ -220,7 +253,12 @@ export function ThreadsCollectionPanel({ onDashboardRefresh }) {
 
             {!loadingRuns &&
               runs.map((run) => (
-                <CollectionRunRow key={run.id} run={run} />
+                <CollectionRunRow
+                  key={run.id}
+                  run={run}
+                  deleting={deletingRunIds.includes(run.id)}
+                  onDelete={handleDeleteRun}
+                />
               ))}
           </div>
         </div>
@@ -272,23 +310,38 @@ function SafetyResultMessage({ result }) {
   );
 }
 
-function CollectionRunRow({ run }) {
+function CollectionRunRow({ run, deleting, onDelete }) {
   const statusLabel = runStatusLabels[run.status] ?? run.status;
   const statusTone = runStatusTones[run.status] ?? runStatusTones.FAILED;
   const failureReason = summarizeFailureReason(run.failureReason);
+  const statusMessage = summarizeStatusMessage(run.statusMessage);
+
+  async function handleDelete() {
+    await onDelete?.(run.id);
+  }
 
   return (
     <article className="rounded-md border border-slate-200 px-3 py-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <StatusBadge tone={statusTone}>{statusLabel}</StatusBadge>
-        <span className="text-xs text-slate-500">실행 #{run.id}</span>
+        <div className="flex flex-wrap items-center gap-2">
+          <StatusBadge tone={statusTone}>{statusLabel}</StatusBadge>
+          <span className="text-xs text-slate-500">실행 #{run.id}</span>
+        </div>
+        <button
+          className="rounded-md border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+          type="button"
+          disabled={deleting}
+          onClick={handleDelete}
+        >
+          {deleting ? '삭제 중' : '삭제'}
+        </button>
       </div>
       <p className="mt-2 text-sm text-slate-700">
         수집 {run.collectedItemCount}, 생성 {run.createdCount}, 중복 {run.duplicateCount}, 실패{' '}
         {run.failedCount}
       </p>
-      {run.statusMessage ? (
-        <p className="mt-1 text-sm text-slate-600">{run.statusMessage}</p>
+      {statusMessage ? (
+        <p className="mt-1 whitespace-pre-wrap break-words text-sm text-slate-600">{statusMessage}</p>
       ) : null}
       <p className="mt-1 text-xs text-slate-500">
         생성 {formatDateTime(run.createdAt)} · 갱신 {formatDateTime(run.updatedAt)}
@@ -312,4 +365,16 @@ function summarizeFailureReason(failureReason) {
     return compactReason;
   }
   return `${compactReason.slice(0, 220)}...`;
+}
+
+function summarizeStatusMessage(statusMessage) {
+  if (!statusMessage) {
+    return statusMessage;
+  }
+
+  const compactMessage = statusMessage.replace(/\s+/g, ' ').trim();
+  if (compactMessage.length <= 220) {
+    return compactMessage;
+  }
+  return `${compactMessage.slice(0, 220)}...`;
 }

@@ -66,13 +66,8 @@ class ThreadsBrowserCollectorTest {
         assertThat(pageClient.request.url()).isEqualTo("https://www.threads.com/@choi.openai");
         assertThat(pageClient.request.profileDirectory()).isEqualTo(tempDir);
         assertThat(pageClient.request.headless()).isTrue();
-        assertThat(pageClient.request.maxScrollCount()).isEqualTo(4);
-        assertThat(sleeper.durations).containsExactly(
-                Duration.ofSeconds(3),
-                Duration.ofSeconds(3),
-                Duration.ofSeconds(3),
-                Duration.ofSeconds(3)
-        );
+        assertThat(pageClient.request.maxScrollCount()).isEqualTo(2);
+        assertThat(sleeper.durations).isEmpty();
     }
 
     @Test

@@ -11,10 +11,12 @@ public class ThreadsBrowserSessionProperties {
     public static final String DEFAULT_CHROME_EXECUTABLE =
             "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
     public static final String DEFAULT_LOGIN_URL = "https://www.threads.net/";
+    public static final String DEFAULT_PROFILE_NAME = "Default";
 
     private Path profileDirectory = DEFAULT_PROFILE_DIRECTORY;
     private String chromeExecutable = DEFAULT_CHROME_EXECUTABLE;
     private String loginUrl = DEFAULT_LOGIN_URL;
+    private String profileName = DEFAULT_PROFILE_NAME;
 
     public Path getProfileDirectory() {
         return profileDirectory;
@@ -38,5 +40,13 @@ public class ThreadsBrowserSessionProperties {
 
     public void setLoginUrl(String loginUrl) {
         this.loginUrl = loginUrl;
+    }
+
+    public String getProfileName() {
+        return profileName;
+    }
+
+    public void setProfileName(String profileName) {
+        this.profileName = profileName;
     }
 }

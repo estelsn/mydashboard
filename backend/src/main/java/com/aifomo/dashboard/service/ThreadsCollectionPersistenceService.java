@@ -15,6 +15,7 @@ import com.aifomo.dashboard.repository.CollectedItemRepository;
 import com.aifomo.dashboard.repository.CollectionRunRepository;
 import com.aifomo.dashboard.repository.InfoItemRepository;
 import com.aifomo.dashboard.util.ContentHashUtil;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,6 +29,7 @@ import java.util.Locale;
 import java.util.regex.Pattern;
 
 @Service
+@Slf4j
 public class ThreadsCollectionPersistenceService {
 
     private static final int TITLE_LIMIT = 120;
@@ -93,6 +95,7 @@ public class ThreadsCollectionPersistenceService {
         int createdCount = 0;
         int duplicateCount = 0;
         int failedCount = 0;
+        int cooldownSkippedCount = 0;
         List<String> failures = new ArrayList<>();
         List<String> messages = new ArrayList<>();
 
@@ -111,11 +114,18 @@ public class ThreadsCollectionPersistenceService {
             }
 
             if (result.status() == ThreadsCollectionStatus.COOLDOWN_SKIPPED) {
-                messages.add(statusMessage(result));
+                cooldownSkippedCount++;
                 continue;
             }
 
             PersistCounts counts = persistPosts(result.source(), result.posts());
+            log.info("Threads persistence result: runId={}, account={}, collectedCount={}, duplicateSkippedCount={}, createdCount={}, failedSaveCount={}",
+                    run.getId(),
+                    result.source().getUrl(),
+                    result.posts().size(),
+                    counts.duplicateCount(),
+                    counts.createdCount(),
+                    counts.failedCount());
             createdCount += counts.createdCount();
             duplicateCount += counts.duplicateCount();
             failedCount += counts.failedCount();
@@ -126,6 +136,10 @@ public class ThreadsCollectionPersistenceService {
                 successfulSourceCount++;
             }
             messages.add(statusMessage(result, counts));
+        }
+
+        if (cooldownSkippedCount > 0) {
+            messages.add("Threads 수집 건너뜀: 쿨다운 정책으로 %d개 소스를 건너뛰었습니다.".formatted(cooldownSkippedCount));
         }
 
         boolean failed = failedSourceCount > 0 || failedCount > 0;
@@ -142,6 +156,14 @@ public class ThreadsCollectionPersistenceService {
                 String.join("; ", messages),
                 failureReason
         );
+        log.info("Threads run persistence complete: runId={}, status={}, collectedCount={}, createdCount={}, duplicateCount={}, failedCount={}, failedSourceCount={}",
+                run.getId(),
+                run.getStatus(),
+                run.getCollectedItemCount(),
+                run.getCreatedCount(),
+                run.getDuplicateCount(),
+                run.getFailedCount(),
+                run.getFailedSourceCount());
         return run;
     }
 
@@ -190,6 +212,10 @@ public class ThreadsCollectionPersistenceService {
             } catch (RuntimeException exception) {
                 failedCount++;
                 failures.add(post.rawUrl() + ": " + exception.getMessage());
+                log.warn("Threads persistence failure: account={}, url={}, stage=save, message={}",
+                        source.getUrl(),
+                        post.rawUrl(),
+                        exception.getMessage());
             }
         }
 

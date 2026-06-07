@@ -1,6 +1,7 @@
 package com.aifomo.dashboard.controller;
 
 import com.aifomo.dashboard.collector.threads.session.ThreadsLoginBrowserLaunchException;
+import com.aifomo.dashboard.service.CollectionRunNotFoundException;
 import com.aifomo.dashboard.service.DuplicateCollectionRunException;
 import com.aifomo.dashboard.service.InfoItemNotFoundException;
 import com.aifomo.dashboard.service.SourceNotFoundException;
@@ -25,6 +26,14 @@ public class ApiExceptionHandler {
     ProblemDetail handleSourceNotFound(SourceNotFoundException exception) {
         ProblemDetail problemDetail = ProblemDetail.forStatus(HttpStatus.NOT_FOUND);
         problemDetail.setTitle("Source not found");
+        problemDetail.setDetail(exception.getMessage());
+        return problemDetail;
+    }
+
+    @ExceptionHandler(CollectionRunNotFoundException.class)
+    ProblemDetail handleCollectionRunNotFound(CollectionRunNotFoundException exception) {
+        ProblemDetail problemDetail = ProblemDetail.forStatus(HttpStatus.NOT_FOUND);
+        problemDetail.setTitle("Collection run not found");
         problemDetail.setDetail(exception.getMessage());
         return problemDetail;
     }

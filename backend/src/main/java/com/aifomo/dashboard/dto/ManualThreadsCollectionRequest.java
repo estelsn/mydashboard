@@ -9,6 +9,6 @@ import java.util.List;
 public record ManualThreadsCollectionRequest(
         @NotEmpty List<String> accountUrls,
         @Min(1) @Max(100) int maxPostsPerAccount,
-        @Min(0) @Max(50) int maxScrollCount
+        @Min(0) @Max(30) int maxScrollCount
 ) {
 }

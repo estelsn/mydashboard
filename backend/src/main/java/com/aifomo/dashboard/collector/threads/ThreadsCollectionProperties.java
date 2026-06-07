@@ -26,8 +26,8 @@ public class ThreadsCollectionProperties {
     }
 
     public static class Defaults {
-        private int maxPostsPerAccount = 3;
-        private int maxScrollCount = 8;
+        private int maxPostsPerAccount = 20;
+        private int maxScrollCount = 5;
 
         public int getMaxPostsPerAccount() {
             return maxPostsPerAccount;
@@ -47,8 +47,8 @@ public class ThreadsCollectionProperties {
     }
 
     public static class Limits {
-        private int maxPostsPerAccount = 5;
-        private int maxScrollCount = 12;
+        private int maxPostsPerAccount = 100;
+        private int maxScrollCount = 30;
 
         public int getMaxPostsPerAccount() {
             return maxPostsPerAccount;

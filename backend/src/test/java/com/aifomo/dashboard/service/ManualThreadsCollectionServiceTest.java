@@ -177,6 +177,12 @@ class ManualThreadsCollectionServiceTest {
                 "recent",
                 true
         ));
+        new ThreadsCollectionPersistenceService(
+                collectionRunRepository,
+                collectedItemRepository,
+                infoItemRepository,
+                CLOCK
+        ).persist(success(source, "existing"));
         source.setLastCollectedAt(NOW.minusMinutes(30));
         sourceRepository.save(source);
         CapturingThreadsCollector collector = collector(request -> success(request.source(), "should not run"));
@@ -189,10 +195,9 @@ class ManualThreadsCollectionServiceTest {
 
         assertThat(collector.requests).isEmpty();
         assertThat(response.status().name()).isEqualTo("SUCCEEDED");
-        assertThat(response.safetyMessage()).contains("최근에 수집한 소스라 건너뛰었습니다.");
-        assertThat(response.safetyMessage()).contains("2026-05-05T12:30");
-        assertThat(collectedItemRepository.findAll()).isEmpty();
-        assertThat(infoItemRepository.findAll()).isEmpty();
+        assertThat(response.safetyMessage()).isEqualTo("쿨다운 정책으로 1개 소스를 건너뛰었습니다.");
+        assertThat(collectedItemRepository.findAll()).hasSize(1);
+        assertThat(infoItemRepository.findAll()).hasSize(1);
     }
 
     private void assertStopsOnRiskStatus(ThreadsCollectionStatus status, String safetyMessage) {
@@ -218,6 +223,7 @@ class ManualThreadsCollectionServiceTest {
         return new ManualThreadsCollectionService(
                 collectionRunRepository,
                 sourceRepository,
+                collectedItemRepository,
                 collector,
                 new ThreadsCollectionPersistenceService(
                         collectionRunRepository,
@@ -229,6 +235,30 @@ class ManualThreadsCollectionServiceTest {
                 sleeper,
                 CLOCK
         );
+    }
+
+    @Test
+    void ignoresCooldownWhenSourceHasNoCollectedItems() {
+        Source source = sourceRepository.save(new Source(
+                "Recent Threads",
+                SourceType.THREADS_ACCOUNT,
+                SourceCategory.NEWS,
+                "https://www.threads.com/@recent",
+                "recent",
+                true
+        ));
+        source.setLastCollectedAt(NOW.minusMinutes(30));
+        sourceRepository.save(source);
+        CapturingThreadsCollector collector = collector(request -> success(request.source(), "fresh"));
+
+        ManualThreadsCollectionResponse response = service(collector).collect(request(
+                List.of("https://www.threads.com/@recent"),
+                3,
+                1
+        ));
+
+        assertThat(collector.requests).hasSize(1);
+        assertThat(response.createdCount()).isEqualTo(1);
     }
 
     private CapturingThreadsCollector collector(Function<ThreadsCollectionRequest, ThreadsCollectionResult> handler) {

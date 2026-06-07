@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { fetchThreadsSessionStatus, openThreadsLoginBrowser } from './dashboardApi';
+import { deleteCollectionRun, fetchThreadsSessionStatus, openThreadsLoginBrowser } from './dashboardApi';
 
 describe('dashboardApi', () => {
   afterEach(() => {
@@ -36,5 +36,23 @@ describe('dashboardApi', () => {
     await expect(fetchThreadsSessionStatus()).rejects.toThrow(
       'GET /api/threads/session failed with HTTP 500 - Failed to open Chrome for Threads login',
     );
+  });
+
+  it('handles a successful collection run delete with an empty 204 response', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 204,
+      headers: {
+        get: vi.fn().mockReturnValue(null),
+      },
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(deleteCollectionRun(7)).resolves.toBeNull();
+    expect(fetchMock).toHaveBeenCalledWith('/api/collection-runs/7', {
+      headers: undefined,
+      cache: undefined,
+      method: 'DELETE',
+    });
   });
 });

@@ -23,6 +23,7 @@ import static org.hamcrest.Matchers.hasSize;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -75,6 +76,27 @@ class CollectionRunApiTest {
                 .andExpect(jsonPath("$[0].failedSourceCount").value(1))
                 .andExpect(jsonPath("$[0].collectedItemCount").value(42))
                 .andExpect(jsonPath("$[0].statusMessage").value("Completed with one source failure"));
+    }
+
+    @Test
+    void deletesCollectionRun() throws Exception {
+        CollectionRun run = collectionRunRepository.save(new CollectionRun(
+                CollectionRunStatus.SUCCEEDED,
+                1,
+                1,
+                0,
+                1,
+                LocalDateTime.of(2026, 5, 1, 10, 0),
+                LocalDateTime.of(2026, 5, 1, 10, 1),
+                "Completed"
+        ));
+
+        mockMvc.perform(delete("/api/collection-runs/{id}", run.getId()))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/api/collection-runs"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(0)));
     }
 
     @Test

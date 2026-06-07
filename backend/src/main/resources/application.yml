@@ -23,20 +23,21 @@ app:
   threads:
     browser-session:
       profile-directory: ./runtime/browser-profiles/threads
+      profile-name: Default
       chrome-executable: /Applications/Google Chrome.app/Contents/MacOS/Google Chrome
       login-url: https://www.threads.net/
     browser-collector:
-      headless: false
-      max-scroll-count: 12
-      max-posts-per-account: 3
+      headless: true
+      max-scroll-count: 30
+      max-posts-per-account: 100
       timeout: 45s
     collection:
       defaults:
-        max-posts-per-account: 3
-        max-scroll-count: 8
+        max-posts-per-account: 20
+        max-scroll-count: 5
       limits:
-        max-posts-per-account: 5
-        max-scroll-count: 12
+        max-posts-per-account: 100
+        max-scroll-count: 30
       safety:
         delay-between-accounts: 5s
         delay-between-scrolls: 3s

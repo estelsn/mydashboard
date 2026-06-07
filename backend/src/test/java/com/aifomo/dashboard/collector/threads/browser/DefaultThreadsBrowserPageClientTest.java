@@ -17,11 +17,11 @@ class DefaultThreadsBrowserPageClientTest {
 
     @Test
     void returnsSuccessWhenAutomationProvidesRenderedDom() {
-        ThreadsBrowserPageSnapshot snapshot = client((chromeExecutable, request) -> """
+        ThreadsBrowserPageSnapshot snapshot = client((chromeExecutable, request) -> rendered("""
                 <article data-threads-post data-author="@choi.openai">
                   <div>Rendered</div>
                 </article>
-                """).fetch(request());
+                """, true)).fetch(request());
 
         assertThat(snapshot.status()).isEqualTo(ThreadsBrowserPageStatus.SUCCESS);
         assertThat(snapshot.rawContent()).contains("Rendered");
@@ -29,9 +29,11 @@ class DefaultThreadsBrowserPageClientTest {
 
     @Test
     void mapsLoginAndAccessRestrictedMarkers() {
-        ThreadsBrowserPageSnapshot loginRequired = client((chromeExecutable, request) -> "<div>로그인</div>")
+        ThreadsBrowserPageSnapshot loginRequired = client((chromeExecutable, request) ->
+                rendered("<div>Threads에서 소통해보세요</div><div>Instagram으로 계속하기</div>", false))
                 .fetch(request());
-        ThreadsBrowserPageSnapshot restricted = client((chromeExecutable, request) -> "<div>이용할 수 없습니다</div>")
+        ThreadsBrowserPageSnapshot restricted = client((chromeExecutable, request) ->
+                rendered("<div>이용할 수 없습니다</div>", false))
                 .fetch(request());
 
         assertThat(loginRequired.status()).isEqualTo(ThreadsBrowserPageStatus.LOGIN_REQUIRED);
@@ -71,5 +73,9 @@ class DefaultThreadsBrowserPageClientTest {
                 4,
                 Duration.ofSeconds(30)
         );
+    }
+
+    private ThreadsBrowserRenderResult rendered(String content, boolean loggedIn) {
+        return new ThreadsBrowserRenderResult(content, loggedIn);
     }
 }

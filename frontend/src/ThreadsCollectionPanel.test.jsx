@@ -1,12 +1,13 @@
 import '@testing-library/jest-dom/vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { collectRecentThreads, collectThreads, fetchCollectionRuns } from './api/dashboardApi';
+import { collectRecentThreads, collectThreads, deleteCollectionRun, fetchCollectionRuns } from './api/dashboardApi';
 import { ThreadsCollectionPanel } from './ThreadsCollectionPanel';
 
 vi.mock('./api/dashboardApi', () => ({
   collectRecentThreads: vi.fn(),
   collectThreads: vi.fn(),
+  deleteCollectionRun: vi.fn(),
   fetchCollectionRuns: vi.fn(),
 }));
 
@@ -86,7 +87,7 @@ describe('ThreadsCollectionPanel', () => {
     expect(collectThreads).toHaveBeenCalledWith({
       accountUrls: ['https://www.threads.com/@example'],
       maxPostsPerAccount: 3,
-      maxScrollCount: 0,
+      maxScrollCount: 5,
     });
     expect(fetchCollectionRuns.mock.calls.length).toBeGreaterThanOrEqual(3);
     expect(onDashboardRefresh).toHaveBeenCalledTimes(1);
@@ -190,6 +191,7 @@ describe('ThreadsCollectionPanel', () => {
     await screen.findByText('수집 실행 기록 없음');
 
     expect(screen.getByLabelText('계정당 최대 게시물')).toHaveValue(3);
+    expect(screen.getByLabelText('최대 스크롤')).toHaveValue(5);
     expect(
       screen.getByText(/현재 구조에서는 게시물 날짜를 기준으로 최신순 정렬 후 상위 결과만 저장합니다/),
     ).toBeInTheDocument();
@@ -225,6 +227,37 @@ describe('ThreadsCollectionPanel', () => {
     fireEvent.click(screen.getByRole('button', { name: '수집 실행' }));
 
     expect(await screen.findByText(message)).toBeInTheDocument();
+  });
+
+  it('deletes a collection run from the recent runs list', async () => {
+    fetchCollectionRuns
+      .mockResolvedValueOnce([
+        {
+          id: 22,
+          status: 'SUCCEEDED',
+          totalSourceCount: 1,
+          successfulSourceCount: 1,
+          failedSourceCount: 0,
+          collectedItemCount: 0,
+          createdCount: 0,
+          duplicateCount: 0,
+          failedCount: 0,
+          failureReason: null,
+          statusMessage: '쿨다운 정책으로 1개 소스를 건너뛰었습니다.',
+        },
+      ])
+      .mockResolvedValueOnce([]);
+    deleteCollectionRun.mockResolvedValue(null);
+
+    render(<ThreadsCollectionPanel onDashboardRefresh={vi.fn()} />);
+
+    expect(await screen.findByText('실행 #22')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '삭제' }));
+
+    await waitFor(() => {
+      expect(deleteCollectionRun).toHaveBeenCalledWith(22);
+    });
+    expect(await screen.findByText('수집 실행 기록 없음')).toBeInTheDocument();
   });
 
   it('shows API errors when manual collection request fails', async () => {
