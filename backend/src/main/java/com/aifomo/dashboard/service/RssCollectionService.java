@@ -41,6 +41,7 @@ public class RssCollectionService {
     private final CollectedItemRepository collectedItemRepository;
     private final InfoItemRepository infoItemRepository;
     private final RssCollector rssCollector;
+    private final EvaluationService evaluationService;
     private final Clock clock;
 
     @Autowired
@@ -49,9 +50,18 @@ public class RssCollectionService {
             CollectionRunRepository collectionRunRepository,
             CollectedItemRepository collectedItemRepository,
             InfoItemRepository infoItemRepository,
-            RssCollector rssCollector
+            RssCollector rssCollector,
+            EvaluationService evaluationService
     ) {
-        this(sourceRepository, collectionRunRepository, collectedItemRepository, infoItemRepository, rssCollector, Clock.systemDefaultZone());
+        this(
+                sourceRepository,
+                collectionRunRepository,
+                collectedItemRepository,
+                infoItemRepository,
+                rssCollector,
+                evaluationService,
+                Clock.systemDefaultZone()
+        );
     }
 
     RssCollectionService(
@@ -60,6 +70,7 @@ public class RssCollectionService {
             CollectedItemRepository collectedItemRepository,
             InfoItemRepository infoItemRepository,
             RssCollector rssCollector,
+            EvaluationService evaluationService,
             Clock clock
     ) {
         this.sourceRepository = sourceRepository;
@@ -67,6 +78,7 @@ public class RssCollectionService {
         this.collectedItemRepository = collectedItemRepository;
         this.infoItemRepository = infoItemRepository;
         this.rssCollector = rssCollector;
+        this.evaluationService = evaluationService;
         this.clock = clock;
     }
 
@@ -88,7 +100,9 @@ public class RssCollectionService {
         List<RssCollectionResult> results = sources.stream()
                 .map(source -> collectSource(source, DEFAULT_MAX_ITEMS_PER_SOURCE))
                 .toList();
-        return persist(run, results);
+        CollectionRun completedRun = persist(run, results);
+        evaluationService.recalculateUnreviewedItems();
+        return completedRun;
     }
 
     private RssCollectionResult collectSource(Source source, int maxItems) {

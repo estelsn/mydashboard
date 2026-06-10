@@ -13,6 +13,7 @@ import com.aifomo.dashboard.domain.source.SourceCategory;
 import com.aifomo.dashboard.domain.source.SourceType;
 import com.aifomo.dashboard.repository.CollectedItemRepository;
 import com.aifomo.dashboard.repository.CollectionRunRepository;
+import com.aifomo.dashboard.repository.CollectionSourceResultRepository;
 import com.aifomo.dashboard.repository.InfoItemRepository;
 import com.aifomo.dashboard.repository.SourceRepository;
 import com.aifomo.dashboard.util.ContentHashUtil;
@@ -46,6 +47,9 @@ class ThreadsCollectionPersistenceServiceTest {
     @Autowired
     private InfoItemRepository infoItemRepository;
 
+    @Autowired
+    private CollectionSourceResultRepository collectionSourceResultRepository;
+
     private ThreadsCollectionPersistenceService service;
     private Source source;
 
@@ -55,6 +59,7 @@ class ThreadsCollectionPersistenceServiceTest {
                 collectionRunRepository,
                 collectedItemRepository,
                 infoItemRepository,
+                collectionSourceResultRepository,
                 Clock.fixed(Instant.parse("2026-05-05T03:30:00Z"), ZoneId.of("Asia/Seoul"))
         );
         source = sourceRepository.save(new Source(

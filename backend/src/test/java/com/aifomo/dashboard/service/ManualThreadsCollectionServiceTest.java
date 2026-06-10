@@ -14,6 +14,8 @@ import com.aifomo.dashboard.dto.ManualThreadsCollectionRequest;
 import com.aifomo.dashboard.dto.ManualThreadsCollectionResponse;
 import com.aifomo.dashboard.repository.CollectedItemRepository;
 import com.aifomo.dashboard.repository.CollectionRunRepository;
+import com.aifomo.dashboard.repository.CollectionSourceResultRepository;
+import com.aifomo.dashboard.repository.EvaluationRepository;
 import com.aifomo.dashboard.repository.InfoItemRepository;
 import com.aifomo.dashboard.repository.SourceRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -49,6 +51,12 @@ class ManualThreadsCollectionServiceTest {
 
     @Autowired
     private InfoItemRepository infoItemRepository;
+
+    @Autowired
+    private CollectionSourceResultRepository collectionSourceResultRepository;
+
+    @Autowired
+    private EvaluationRepository evaluationRepository;
 
     private ThreadsCollectionProperties properties;
     private CapturingSleeper sleeper;
@@ -102,24 +110,18 @@ class ManualThreadsCollectionServiceTest {
     void stopsImmediatelyWhenLoginRequired() {
         assertStopsOnRiskStatus(
                 ThreadsCollectionStatus.LOGIN_REQUIRED,
-                "Threads 로그인이 필요해 수집을 중단했습니다."
+                "공용 Threads 세션을 사용할 수 없어 전체 수집을 중단했습니다."
         );
     }
 
     @Test
-    void stopsImmediatelyWhenAccessRestricted() {
-        assertStopsOnRiskStatus(
-                ThreadsCollectionStatus.ACCESS_RESTRICTED,
-                "접근 제한이 감지되어 수집을 중단했습니다."
-        );
+    void continuesAfterAccessRestricted() {
+        assertContinuesAfterSourceFailure(ThreadsCollectionStatus.ACCESS_RESTRICTED);
     }
 
     @Test
-    void stopsImmediatelyWhenTimedOut() {
-        assertStopsOnRiskStatus(
-                ThreadsCollectionStatus.TIMEOUT,
-                "시간 초과로 수집을 중단했습니다."
-        );
+    void continuesAfterTimeout() {
+        assertContinuesAfterSourceFailure(ThreadsCollectionStatus.TIMEOUT);
     }
 
     @Test
@@ -151,7 +153,8 @@ class ManualThreadsCollectionServiceTest {
                                 NOW.minusDays(1),
                                 NOW
                         ),
-                        new ThreadsCollectedPost(request.source().getUrl() + "/post/old", "old", NOW.minusDays(4), NOW)
+                        new ThreadsCollectedPost(request.source().getUrl() + "/post/old", "old", NOW.minusDays(4), NOW),
+                        new ThreadsCollectedPost(request.source().getUrl() + "/post/unknown", "unknown", null, NOW)
                 ),
                 List.of()
         ));
@@ -168,6 +171,26 @@ class ManualThreadsCollectionServiceTest {
     }
 
     @Test
+    void evaluatesNewItemsImmediatelyAfterCollection() {
+        CapturingThreadsCollector collector = collector(request -> success(
+                request.source(),
+                "Codex OAuth integration setup guide for developer automation workflows."
+        ));
+
+        ManualThreadsCollectionResponse response = service(collector).collect(request(
+                List.of("https://www.threads.com/@choi.openai"),
+                3,
+                1
+        ));
+
+        assertThat(response.createdCount()).isEqualTo(1);
+        assertThat(infoItemRepository.findAll()).singleElement().satisfies(infoItem ->
+                assertThat(infoItem.getDecisionStatus()).isEqualTo(com.aifomo.dashboard.domain.info.DecisionStatus.APPLY));
+        assertThat(evaluationRepository.findAll()).singleElement().satisfies(evaluation ->
+                assertThat(evaluation.getEvaluatorVersion()).isEqualTo(RuleBasedEvaluator.EVALUATOR_VERSION));
+    }
+
+    @Test
     void skipsRecentlyCollectedSourceByCooldownPolicy() {
         Source source = sourceRepository.save(new Source(
                 "Recent Threads",
@@ -181,6 +204,7 @@ class ManualThreadsCollectionServiceTest {
                 collectionRunRepository,
                 collectedItemRepository,
                 infoItemRepository,
+                collectionSourceResultRepository,
                 CLOCK
         ).persist(success(source, "existing"));
         source.setLastCollectedAt(NOW.minusMinutes(30));
@@ -219,17 +243,44 @@ class ManualThreadsCollectionServiceTest {
         assertThat(response.safetyMessage()).isEqualTo(safetyMessage);
     }
 
+    private void assertContinuesAfterSourceFailure(ThreadsCollectionStatus status) {
+        CapturingThreadsCollector collector = collector(request -> {
+            if (request.source().getUrl().endsWith("@first")) {
+                return ThreadsCollectionResult.failure(request.source(), status, status.name());
+            }
+            return success(request.source(), "second source success");
+        });
+
+        ManualThreadsCollectionResponse response = service(collector).collect(request(List.of(
+                "https://www.threads.com/@first",
+                "https://www.threads.com/@second"
+        ), 3, 1));
+
+        assertThat(collector.requests).hasSize(2);
+        assertThat(response.status().name()).isEqualTo("PARTIAL_SUCCESS");
+        assertThat(response.createdCount()).isEqualTo(1);
+        assertThat(response.sourceResults()).hasSize(2);
+        assertThat(response.safetyMessage()).contains("나머지 소스 수집을 계속");
+    }
+
     private ManualThreadsCollectionService service(ThreadsCollector collector) {
         return new ManualThreadsCollectionService(
                 collectionRunRepository,
                 sourceRepository,
                 collectedItemRepository,
+                collectionSourceResultRepository,
                 collector,
                 new ThreadsCollectionPersistenceService(
                         collectionRunRepository,
                         collectedItemRepository,
                         infoItemRepository,
+                        collectionSourceResultRepository,
                         CLOCK
+                ),
+                new EvaluationService(
+                        new RuleBasedEvaluator(),
+                        infoItemRepository,
+                        evaluationRepository
                 ),
                 properties,
                 sleeper,

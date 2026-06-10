@@ -178,7 +178,7 @@ public class ThreadsBrowserCollector implements ThreadsCollector {
         return new ThreadsCollectedPost(
                 rawUrl,
                 parsedPost.rawContent(),
-                resolvePublishedAt(parsedPost).orElse(collectedAt),
+                resolvePublishedAt(parsedPost).orElse(null),
                 collectedAt
         );
     }

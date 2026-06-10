@@ -58,17 +58,13 @@ class BackendApiTest {
         infoItemRepository.deleteAll();
         collectedItemRepository.deleteAll();
 
-        Source codexSource = sourceRepository.findAllByOrderByPriorityAscIdAsc().stream()
-                .filter(source -> source.getName().equals("Appcast"))
-                .findFirst()
-                .orElseThrow();
         Source newsSource = sourceRepository.findAllByOrderByPriorityAscIdAsc().stream()
                 .filter(source -> source.getName().equals("Choi OpenAI"))
                 .findFirst()
                 .orElseThrow();
 
         createInfoItem(
-                codexSource,
+                newsSource,
                 "Codex workflow setup",
                 "Codex workflow update shows a practical agent setup for code review and verification.",
                 DecisionStatus.APPLY,
@@ -94,12 +90,12 @@ class BackendApiTest {
     void exposesSourceList() throws Exception {
         mockMvc.perform(get("/api/sources"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(13)))
+                .andExpect(jsonPath("$", hasSize(8)))
                 .andExpect(jsonPath("$[0].id").exists())
                 .andExpect(jsonPath("$[0].sourceType").value("THREADS_ACCOUNT"))
                 .andExpect(jsonPath("$[0].enabled").value(true))
                 .andExpect(jsonPath("$[0].priority").value(10))
-                .andExpect(jsonPath("$[12].sourceType").value("RSS_FEED"));
+                .andExpect(jsonPath("$[7].sourceType").value("RSS_FEED"));
     }
 
     @Test

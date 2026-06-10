@@ -1,11 +1,11 @@
 import '@testing-library/jest-dom/vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { collectRecentThreads, collectThreads, deleteCollectionRun, fetchCollectionRuns } from './api/dashboardApi';
+import { collectEnabledThreads, collectThreads, deleteCollectionRun, fetchCollectionRuns } from './api/dashboardApi';
 import { ThreadsCollectionPanel } from './ThreadsCollectionPanel';
 
 vi.mock('./api/dashboardApi', () => ({
-  collectRecentThreads: vi.fn(),
+  collectEnabledThreads: vi.fn(),
   collectThreads: vi.fn(),
   deleteCollectionRun: vi.fn(),
   fetchCollectionRuns: vi.fn(),
@@ -13,7 +13,7 @@ vi.mock('./api/dashboardApi', () => ({
 
 describe('ThreadsCollectionPanel', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
   });
 
   afterEach(() => {
@@ -73,17 +73,23 @@ describe('ThreadsCollectionPanel', () => {
 
     expect(await screen.findByText('수집 실행 기록 없음')).toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText('계정 URL'), {
+    fireEvent.change(screen.getByLabelText('단일 계정 진단 URL'), {
       target: { value: 'https://www.threads.com/@example' },
     });
-    fireEvent.click(screen.getByRole('button', { name: '수집 실행' }));
+    fireEvent.click(screen.getByRole('button', { name: '단일 계정 진단 수집' }));
 
-    expect(screen.getByRole('button', { name: '수집 실행 중' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '진단 수집 중' })).toBeDisabled();
     expect(await screen.findByText('실행 결과: 수집 3, 생성 2, 중복 1, 실패 0')).toBeInTheDocument();
     expect(screen.getByText('적용 제한: 계정당 게시물 3/3')).toBeInTheDocument();
     expect(screen.getByText('안전 제한을 적용해 수집했습니다.')).toBeInTheDocument();
     expect(screen.getByText('실행 #10')).toBeInTheDocument();
+    expect(screen.queryByText('수집 3, 생성 2, 중복 1, 실패 0')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '성공 실행 #10 상세 펼치기' }));
     expect(screen.getByText('수집 3, 생성 2, 중복 1, 실패 0')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '성공 실행 #10 상세 접기' })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
     expect(collectThreads).toHaveBeenCalledWith({
       accountUrls: ['https://www.threads.com/@example'],
       maxPostsPerAccount: 3,
@@ -93,7 +99,7 @@ describe('ThreadsCollectionPanel', () => {
     expect(onDashboardRefresh).toHaveBeenCalledTimes(1);
   });
 
-  it('runs recent three-day collection across enabled sources', async () => {
+  it('runs collection across enabled sources', async () => {
     const onDashboardRefresh = vi.fn().mockResolvedValue(undefined);
     fetchCollectionRuns
       .mockResolvedValueOnce([])
@@ -127,7 +133,7 @@ describe('ThreadsCollectionPanel', () => {
           statusMessage: '수집 완료',
         },
       ]);
-    collectRecentThreads.mockResolvedValue({
+    collectEnabledThreads.mockResolvedValue({
       runId: 20,
       status: 'SUCCEEDED',
       collectedCount: 4,
@@ -145,12 +151,12 @@ describe('ThreadsCollectionPanel', () => {
     render(<ThreadsCollectionPanel onDashboardRefresh={onDashboardRefresh} />);
 
     await screen.findByText('수집 실행 기록 없음');
-    fireEvent.click(screen.getByRole('button', { name: '최근 3일 수집' }));
+    fireEvent.click(screen.getByRole('button', { name: '활성 소스 전체 수집' }));
 
-    expect(screen.getByRole('button', { name: '최근 3일 수집 중' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '활성 소스 수집 중' })).toBeDisabled();
     expect(await screen.findByText('실행 결과: 수집 4, 생성 3, 중복 1, 실패 0')).toBeInTheDocument();
     expect(screen.getByText(/최근 3일 필터/)).toBeInTheDocument();
-    expect(collectRecentThreads).toHaveBeenCalledTimes(1);
+    expect(collectEnabledThreads).toHaveBeenCalledTimes(1);
     expect(onDashboardRefresh).toHaveBeenCalledTimes(1);
   });
 
@@ -174,10 +180,10 @@ describe('ThreadsCollectionPanel', () => {
     render(<ThreadsCollectionPanel onDashboardRefresh={vi.fn()} />);
 
     await screen.findByText('수집 실행 기록 없음');
-    fireEvent.change(screen.getByLabelText('계정 URL'), {
+    fireEvent.change(screen.getByLabelText('단일 계정 진단 URL'), {
       target: { value: 'https://www.threads.com/@example' },
     });
-    fireEvent.click(screen.getByRole('button', { name: '수집 실행' }));
+    fireEvent.click(screen.getByRole('button', { name: '단일 계정 진단 수집' }));
 
     expect(await screen.findByText('실패 사유: Threads 로그인이 필요합니다.')).toBeInTheDocument();
     expect(screen.getByText('Threads 로그인이 필요해 수집을 중단했습니다.')).toBeInTheDocument();
@@ -193,13 +199,13 @@ describe('ThreadsCollectionPanel', () => {
     expect(screen.getByLabelText('계정당 최대 게시물')).toHaveValue(3);
     expect(screen.getByLabelText('최대 스크롤')).toHaveValue(5);
     expect(
-      screen.getByText(/현재 구조에서는 게시물 날짜를 기준으로 최신순 정렬 후 상위 결과만 저장합니다/),
+      screen.getByText(/운영 수집은 활성 소스 전체를 대상으로 실행합니다/),
     ).toBeInTheDocument();
   });
 
   it.each([
-    ['ACCESS_RESTRICTED', '접근 제한 가능성: 수집을 즉시 중단했습니다.'],
-    ['TIMEOUT', '시간 초과: 수집을 즉시 중단했습니다.'],
+    ['ACCESS_RESTRICTED', '접근 제한: 해당 소스 실패를 기록했습니다.'],
+    ['TIMEOUT', '시간 초과: 해당 소스 실패를 기록했습니다.'],
     ['COOLDOWN_SKIPPED', '최근 수집된 Source라서 쿨다운 정책에 따라 건너뛰었습니다.'],
   ])('shows distinct safety message for %s', async (status, message) => {
     fetchCollectionRuns.mockResolvedValue([]);
@@ -221,10 +227,10 @@ describe('ThreadsCollectionPanel', () => {
     render(<ThreadsCollectionPanel onDashboardRefresh={vi.fn()} />);
 
     await screen.findByText('수집 실행 기록 없음');
-    fireEvent.change(screen.getByLabelText('계정 URL'), {
+    fireEvent.change(screen.getByLabelText('단일 계정 진단 URL'), {
       target: { value: 'https://www.threads.com/@example' },
     });
-    fireEvent.click(screen.getByRole('button', { name: '수집 실행' }));
+    fireEvent.click(screen.getByRole('button', { name: '단일 계정 진단 수집' }));
 
     expect(await screen.findByText(message)).toBeInTheDocument();
   });
@@ -252,6 +258,9 @@ describe('ThreadsCollectionPanel', () => {
     render(<ThreadsCollectionPanel onDashboardRefresh={vi.fn()} />);
 
     expect(await screen.findByText('실행 #22')).toBeInTheDocument();
+    expect(
+      screen.queryByText('쿨다운 정책으로 1개 소스를 건너뛰었습니다.'),
+    ).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '삭제' }));
 
     await waitFor(() => {
@@ -267,10 +276,10 @@ describe('ThreadsCollectionPanel', () => {
     render(<ThreadsCollectionPanel onDashboardRefresh={vi.fn()} />);
 
     await screen.findByText('수집 실행 기록 없음');
-    fireEvent.change(screen.getByLabelText('계정 URL'), {
+    fireEvent.change(screen.getByLabelText('단일 계정 진단 URL'), {
       target: { value: 'https://www.threads.com/@example' },
     });
-    fireEvent.click(screen.getByRole('button', { name: '수집 실행' }));
+    fireEvent.click(screen.getByRole('button', { name: '단일 계정 진단 수집' }));
 
     await waitFor(() => {
       expect(

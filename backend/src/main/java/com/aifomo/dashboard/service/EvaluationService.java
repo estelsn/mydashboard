@@ -58,7 +58,7 @@ public class EvaluationService {
         return evaluationRepository.save(new Evaluation(
                 infoItem,
                 decisionStatus,
-                "Manual decision status update.",
+                "사용자가 분류 상태를 직접 변경했습니다.",
                 1.0,
                 manualRelevanceScore(decisionStatus),
                 manualActionabilityScore(decisionStatus),
@@ -73,7 +73,7 @@ public class EvaluationService {
         return evaluationRepository.save(new Evaluation(
                 infoItem,
                 infoItem.getDecisionStatus(),
-                "LLM evaluation stub recorded without external API calls.",
+                "외부 API 호출 없이 LLM 평가 준비 상태만 기록했습니다.",
                 0.0,
                 0.0,
                 0.0,

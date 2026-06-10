@@ -61,6 +61,7 @@ class ThreadsBrowserCollectorTest {
         assertThat(result.status()).isEqualTo(ThreadsCollectionStatus.SUCCESS);
         assertThat(result.posts()).hasSize(1);
         assertThat(result.posts().getFirst().rawContent()).contains("First post");
+        assertThat(result.posts().getFirst().publishedAt()).isNull();
         assertThat(result.posts().getFirst().collectedAt())
                 .isEqualTo(LocalDateTime.of(2026, 5, 5, 12, 0));
         assertThat(pageClient.request.url()).isEqualTo("https://www.threads.com/@choi.openai");

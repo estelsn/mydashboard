@@ -4,6 +4,7 @@ import com.aifomo.dashboard.domain.collection.CollectionRun;
 import com.aifomo.dashboard.domain.collection.CollectionRunStatus;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 public record CollectionRunResponse(
         Long id,
@@ -20,9 +21,13 @@ public record CollectionRunResponse(
         String statusMessage,
         String failureReason,
         LocalDateTime createdAt,
-        LocalDateTime updatedAt
+        LocalDateTime updatedAt,
+        List<CollectionSourceResultResponse> sourceResults
 ) {
-    public static CollectionRunResponse from(CollectionRun collectionRun) {
+    public static CollectionRunResponse from(
+            CollectionRun collectionRun,
+            List<CollectionSourceResultResponse> sourceResults
+    ) {
         return new CollectionRunResponse(
                 collectionRun.getId(),
                 collectionRun.getStatus(),
@@ -38,7 +43,8 @@ public record CollectionRunResponse(
                 collectionRun.getStatusMessage(),
                 collectionRun.getFailureReason(),
                 collectionRun.getCreatedAt(),
-                collectionRun.getUpdatedAt()
+                collectionRun.getUpdatedAt(),
+                sourceResults
         );
     }
 }

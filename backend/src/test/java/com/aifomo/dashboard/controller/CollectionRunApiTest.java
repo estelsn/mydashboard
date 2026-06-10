@@ -7,6 +7,7 @@ import com.aifomo.dashboard.collector.threads.ThreadsCollector;
 import com.aifomo.dashboard.domain.collection.CollectionRun;
 import com.aifomo.dashboard.domain.collection.CollectionRunStatus;
 import com.aifomo.dashboard.repository.CollectionRunRepository;
+import com.aifomo.dashboard.repository.CollectionSourceResultRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -45,11 +46,15 @@ class CollectionRunApiTest {
     @Autowired
     private CollectionRunRepository collectionRunRepository;
 
+    @Autowired
+    private CollectionSourceResultRepository collectionSourceResultRepository;
+
     @MockBean
     private ThreadsCollector threadsCollector;
 
     @BeforeEach
     void setUp() {
+        collectionSourceResultRepository.deleteAll();
         collectionRunRepository.deleteAll();
     }
 
@@ -150,6 +155,25 @@ class CollectionRunApiTest {
                 .andExpect(jsonPath("$.createdCount").exists())
                 .andExpect(jsonPath("$.duplicateCount").exists())
                 .andExpect(jsonPath("$.safetyMessage").value(org.hamcrest.Matchers.containsString("최근 3일 필터")));
+    }
+
+    @Test
+    void runsEnabledThreadsCollectionForEnabledSources() throws Exception {
+        when(threadsCollector.collect(any())).thenAnswer(invocation -> {
+            var request = invocation.getArgument(0, com.aifomo.dashboard.collector.threads.ThreadsCollectionRequest.class);
+            return new ThreadsCollectionResult(request.source(), List.of(new ThreadsCollectedPost(
+                    request.source().getUrl() + "/post/enabled",
+                    "Codex workflow integration update for developers",
+                    LocalDateTime.now().minusHours(1),
+                    LocalDateTime.now()
+            )), List.of());
+        });
+
+        mockMvc.perform(post("/api/collection-runs/threads/enabled"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.runId").isNumber())
+                .andExpect(jsonPath("$.sourceResults").isArray())
+                .andExpect(jsonPath("$.sourceResults[0].sourceName").exists());
     }
 
     @Test

@@ -43,6 +43,4 @@ app:
         delay-between-scrolls: 3s
         min-source-recollection-interval: 60m
         stop-on-statuses:
-          - ACCESS_RESTRICTED
           - LOGIN_REQUIRED
-          - TIMEOUT

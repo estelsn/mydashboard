@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { collectRecentThreads, collectThreads, deleteCollectionRun, fetchCollectionRuns } from './api/dashboardApi';
+import { collectEnabledThreads, collectThreads, deleteCollectionRun, fetchCollectionRuns } from './api/dashboardApi';
 import { StateMessage, StatusBadge, formatDateTime } from './ui';
 
 const runStatusLabels = {
@@ -18,8 +18,8 @@ const runStatusTones = {
 
 const safetyStatusMessages = {
   LOGIN_REQUIRED: '세션 확인 필요: Threads 로그인이 필요합니다.',
-  ACCESS_RESTRICTED: '접근 제한 가능성: 수집을 즉시 중단했습니다.',
-  TIMEOUT: '시간 초과: 수집을 즉시 중단했습니다.',
+  ACCESS_RESTRICTED: '접근 제한: 해당 소스 실패를 기록했습니다.',
+  TIMEOUT: '시간 초과: 해당 소스 실패를 기록했습니다.',
   COOLDOWN_SKIPPED: '최근 수집된 Source라서 쿨다운 정책에 따라 건너뛰었습니다.',
 };
 
@@ -30,11 +30,11 @@ export function ThreadsCollectionPanel({ onDashboardRefresh }) {
   const [runs, setRuns] = useState([]);
   const [loadingRuns, setLoadingRuns] = useState(true);
   const [collecting, setCollecting] = useState(false);
-  const [collectingRecent, setCollectingRecent] = useState(false);
+  const [collectingEnabled, setCollectingEnabled] = useState(false);
   const [deletingRunIds, setDeletingRunIds] = useState([]);
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
-  const busy = collecting || collectingRecent;
+  const busy = collecting || collectingEnabled;
   const resultFailureReason = summarizeFailureReason(result?.failureReason);
 
   async function refreshRuns() {
@@ -97,19 +97,19 @@ export function ThreadsCollectionPanel({ onDashboardRefresh }) {
     }
   }
 
-  async function handleCollectRecent() {
-    setCollectingRecent(true);
+  async function handleCollectEnabled() {
+    setCollectingEnabled(true);
     setError('');
     setResult(null);
 
     try {
-      const response = await collectRecentThreads();
+      const response = await collectEnabledThreads();
       setResult(response);
       await Promise.all([refreshRuns(), onDashboardRefresh?.()]);
     } catch (nextError) {
       setError(nextError.message);
     } finally {
-      setCollectingRecent(false);
+      setCollectingEnabled(false);
     }
   }
 
@@ -165,35 +165,35 @@ export function ThreadsCollectionPanel({ onDashboardRefresh }) {
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(320px,420px)]">
         <form className="flex flex-col gap-4" onSubmit={handleCollect}>
           <div>
-            <h2 className="text-base font-semibold text-slate-950">Threads 수동 수집</h2>
+            <h2 className="text-base font-semibold text-slate-950">Threads 수집</h2>
             <p className="mt-1 text-sm text-slate-600">
-              Threads 수집은 계정 보호를 위해 낮은 기본값을 적용합니다. 현재 구조에서는 게시물 날짜를
-              기준으로 최신순 정렬 후 상위 결과만 저장합니다.
+              운영 수집은 활성 소스 전체를 대상으로 실행합니다. 단일 URL 입력은 계정별 문제를 확인하는
+              진단 용도입니다.
             </p>
           </div>
 
           <div className="rounded-md border border-teal-100 bg-teal-50/70 p-3">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <p className="text-sm font-semibold text-teal-900">활성 소스 최근 3일 수집</p>
+                <p className="text-sm font-semibold text-teal-900">활성 소스 전체 수집</p>
                 <p className="mt-1 text-sm text-teal-800">
-                  클릭 시점 기준 최근 3일 게시물만 수집합니다. 활성 Threads 소스를 순차 실행하고 계정 간
-                  대기 시간을 둡니다.
+                  활성화된 Threads 소스를 우선순위대로 수집하고 최근 3일 게시물만 저장합니다. 계정별
+                  실패는 기록한 뒤 다음 소스를 계속 처리합니다.
                 </p>
               </div>
               <button
                 className="w-fit rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-50"
                 type="button"
                 disabled={busy}
-                onClick={handleCollectRecent}
+                onClick={handleCollectEnabled}
               >
-                {collectingRecent ? '최근 3일 수집 중' : '최근 3일 수집'}
+                {collectingEnabled ? '활성 소스 수집 중' : '활성 소스 전체 수집'}
               </button>
             </div>
           </div>
 
           <label className="flex flex-col gap-1.5 text-sm font-medium text-slate-700">
-            계정 URL
+            단일 계정 진단 URL
             <input
               className="rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-950 shadow-sm outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
               type="url"
@@ -232,7 +232,7 @@ export function ThreadsCollectionPanel({ onDashboardRefresh }) {
             type="submit"
             disabled={busy}
           >
-            {collecting ? '수집 실행 중' : '수집 실행'}
+            {collecting ? '진단 수집 중' : '단일 계정 진단 수집'}
           </button>
         </form>
 
@@ -274,12 +274,13 @@ export function ThreadsCollectionPanel({ onDashboardRefresh }) {
             </span>
           ) : null}
           <SafetyResultMessage result={result} />
+          <SourceResults sourceResults={result.sourceResults} />
         </StateMessage>
       ) : null}
 
       {busy ? (
         <StateMessage tone="loading" className="mt-4">
-          {collectingRecent ? '최근 3일 수집을 진행 중입니다.' : '수동 수집을 진행 중입니다.'}
+          {collectingEnabled ? '활성 소스 전체 수집을 진행 중입니다.' : '단일 계정 진단 수집을 진행 중입니다.'}
         </StateMessage>
       ) : null}
 
@@ -310,7 +311,25 @@ function SafetyResultMessage({ result }) {
   );
 }
 
+function SourceResults({ sourceResults = [] }) {
+  if (sourceResults.length === 0) {
+    return null;
+  }
+
+  return (
+    <span className="mt-3 block border-t border-slate-200 pt-2">
+      {sourceResults.map((sourceResult) => (
+        <span className="block" key={sourceResult.id ?? sourceResult.sourceId}>
+          {sourceResult.sourceName}: {sourceResult.status} · 생성 {sourceResult.createdCount} · 중복{' '}
+          {sourceResult.duplicateCount} · 실패 {sourceResult.failedCount}
+        </span>
+      ))}
+    </span>
+  );
+}
+
 function CollectionRunRow({ run, deleting, onDelete }) {
+  const [expanded, setExpanded] = useState(false);
   const statusLabel = runStatusLabels[run.status] ?? run.status;
   const statusTone = runStatusTones[run.status] ?? runStatusTones.FAILED;
   const failureReason = summarizeFailureReason(run.failureReason);
@@ -323,10 +342,16 @@ function CollectionRunRow({ run, deleting, onDelete }) {
   return (
     <article className="rounded-md border border-slate-200 px-3 py-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex flex-wrap items-center gap-2">
+        <button
+          className="flex flex-wrap items-center gap-2 text-left"
+          type="button"
+          aria-expanded={expanded}
+          aria-label={`${statusLabel} 실행 #${run.id} 상세 ${expanded ? '접기' : '펼치기'}`}
+          onClick={() => setExpanded((current) => !current)}
+        >
           <StatusBadge tone={statusTone}>{statusLabel}</StatusBadge>
           <span className="text-xs text-slate-500">실행 #{run.id}</span>
-        </div>
+        </button>
         <button
           className="rounded-md border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
           type="button"
@@ -336,20 +361,25 @@ function CollectionRunRow({ run, deleting, onDelete }) {
           {deleting ? '삭제 중' : '삭제'}
         </button>
       </div>
-      <p className="mt-2 text-sm text-slate-700">
-        수집 {run.collectedItemCount}, 생성 {run.createdCount}, 중복 {run.duplicateCount}, 실패{' '}
-        {run.failedCount}
-      </p>
-      {statusMessage ? (
-        <p className="mt-1 whitespace-pre-wrap break-words text-sm text-slate-600">{statusMessage}</p>
-      ) : null}
-      <p className="mt-1 text-xs text-slate-500">
-        생성 {formatDateTime(run.createdAt)} · 갱신 {formatDateTime(run.updatedAt)}
-      </p>
-      {failureReason ? (
-        <p className="mt-2 whitespace-pre-wrap break-words rounded-md border border-red-100 bg-red-50 px-2.5 py-2 text-sm text-red-700">
-          실패 사유: {failureReason}
-        </p>
+      {expanded ? (
+        <>
+          <p className="mt-2 text-sm text-slate-700">
+            수집 {run.collectedItemCount}, 생성 {run.createdCount}, 중복 {run.duplicateCount}, 실패{' '}
+            {run.failedCount}
+          </p>
+          {statusMessage ? (
+            <p className="mt-1 whitespace-pre-wrap break-words text-sm text-slate-600">{statusMessage}</p>
+          ) : null}
+          <p className="mt-1 text-xs text-slate-500">
+            생성 {formatDateTime(run.createdAt)} · 갱신 {formatDateTime(run.updatedAt)}
+          </p>
+          {failureReason ? (
+            <p className="mt-2 whitespace-pre-wrap break-words rounded-md border border-red-100 bg-red-50 px-2.5 py-2 text-sm text-red-700">
+              실패 사유: {failureReason}
+            </p>
+          ) : null}
+          <SourceResults sourceResults={run.sourceResults} />
+        </>
       ) : null}
     </article>
   );

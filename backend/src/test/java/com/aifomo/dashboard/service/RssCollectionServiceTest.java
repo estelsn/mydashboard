@@ -13,6 +13,7 @@ import com.aifomo.dashboard.domain.source.SourceType;
 import com.aifomo.dashboard.repository.CollectedItemRepository;
 import com.aifomo.dashboard.repository.CollectionRunRepository;
 import com.aifomo.dashboard.repository.InfoItemRepository;
+import com.aifomo.dashboard.repository.EvaluationRepository;
 import com.aifomo.dashboard.repository.SourceRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -44,6 +45,9 @@ class RssCollectionServiceTest {
 
     @Autowired
     private InfoItemRepository infoItemRepository;
+
+    @Autowired
+    private EvaluationRepository evaluationRepository;
 
     private RssCollectionService service;
     private Source rssSource;
@@ -110,7 +114,7 @@ class RssCollectionServiceTest {
         assertThat(collectedItemRepository.findAll()).hasSize(2);
         assertThat(infoItemRepository.findAll()).hasSize(2)
                 .allSatisfy(infoItem -> {
-                    assertThat(infoItem.getDecisionStatus()).isEqualTo(DecisionStatus.UNREVIEWED);
+                    assertThat(infoItem.getDecisionStatus()).isEqualTo(DecisionStatus.APPLY);
                     assertThat(infoItem.getCategory()).isEqualTo(SourceCategory.COMPANY_OFFICIAL);
                     assertThat(infoItem.getPublishedAt()).isEqualTo(PUBLISHED_AT);
                     assertThat(infoItem.getCollectedAt()).isEqualTo(COLLECTED_AT);
@@ -147,6 +151,11 @@ class RssCollectionServiceTest {
                 collectedItemRepository,
                 infoItemRepository,
                 collector,
+                new EvaluationService(
+                        new RuleBasedEvaluator(),
+                        infoItemRepository,
+                        evaluationRepository
+                ),
                 Clock.fixed(Instant.parse("2026-05-05T03:30:00Z"), ZoneId.of("Asia/Seoul"))
         );
     }

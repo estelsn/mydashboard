@@ -37,7 +37,11 @@ class DataSeederTest {
         dataSeeder.run();
         dataSeeder.run();
 
-        assertThat(sourceRepository.count()).isEqualTo(13);
+        assertThat(sourceRepository.count()).isEqualTo(8);
+        assertThat(sourceRepository.findAll())
+                .noneMatch(source -> source.getUrl().matches(
+                        "https://www\\.threads\\.com/@(appcast|ethancl|specal1849|xazinga|apple_tea_94)"
+                ));
         assertThat(collectedItemRepository.count()).isZero();
         assertThat(infoItemRepository.count()).isZero();
         assertThat(evaluationRepository.count()).isZero();

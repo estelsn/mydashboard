@@ -47,4 +47,9 @@ public class CollectionRunController {
     public ManualThreadsCollectionResponse collectRecentThreads() {
         return manualThreadsCollectionService.collectRecentFromEnabledSources();
     }
+
+    @PostMapping("/threads/enabled")
+    public ManualThreadsCollectionResponse collectEnabledThreads() {
+        return manualThreadsCollectionService.collectEnabledSources();
+    }
 }

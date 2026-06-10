@@ -14,8 +14,10 @@ import com.aifomo.dashboard.domain.source.SourceCategory;
 import com.aifomo.dashboard.domain.source.SourceType;
 import com.aifomo.dashboard.dto.ManualThreadsCollectionRequest;
 import com.aifomo.dashboard.dto.ManualThreadsCollectionResponse;
+import com.aifomo.dashboard.dto.CollectionSourceResultResponse;
 import com.aifomo.dashboard.repository.CollectedItemRepository;
 import com.aifomo.dashboard.repository.CollectionRunRepository;
+import com.aifomo.dashboard.repository.CollectionSourceResultRepository;
 import com.aifomo.dashboard.repository.SourceRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -39,8 +41,10 @@ public class ManualThreadsCollectionService {
     private final CollectionRunRepository collectionRunRepository;
     private final SourceRepository sourceRepository;
     private final CollectedItemRepository collectedItemRepository;
+    private final CollectionSourceResultRepository collectionSourceResultRepository;
     private final ThreadsCollector threadsCollector;
     private final ThreadsCollectionPersistenceService persistenceService;
+    private final EvaluationService evaluationService;
     private final ThreadsCollectionProperties properties;
     private final ThreadsCollectionSleeper sleeper;
     private final Clock clock;
@@ -50,20 +54,35 @@ public class ManualThreadsCollectionService {
             CollectionRunRepository collectionRunRepository,
             SourceRepository sourceRepository,
             CollectedItemRepository collectedItemRepository,
+            CollectionSourceResultRepository collectionSourceResultRepository,
             ThreadsCollector threadsCollector,
             ThreadsCollectionPersistenceService persistenceService,
+            EvaluationService evaluationService,
             ThreadsCollectionProperties properties,
             ThreadsCollectionSleeper sleeper
     ) {
-        this(collectionRunRepository, sourceRepository, collectedItemRepository, threadsCollector, persistenceService, properties, sleeper, Clock.systemDefaultZone());
+        this(
+                collectionRunRepository,
+                sourceRepository,
+                collectedItemRepository,
+                collectionSourceResultRepository,
+                threadsCollector,
+                persistenceService,
+                evaluationService,
+                properties,
+                sleeper,
+                Clock.systemDefaultZone()
+        );
     }
 
     ManualThreadsCollectionService(
             CollectionRunRepository collectionRunRepository,
             SourceRepository sourceRepository,
             CollectedItemRepository collectedItemRepository,
+            CollectionSourceResultRepository collectionSourceResultRepository,
             ThreadsCollector threadsCollector,
             ThreadsCollectionPersistenceService persistenceService,
+            EvaluationService evaluationService,
             ThreadsCollectionProperties properties,
             ThreadsCollectionSleeper sleeper,
             Clock clock
@@ -71,8 +90,10 @@ public class ManualThreadsCollectionService {
         this.collectionRunRepository = collectionRunRepository;
         this.sourceRepository = sourceRepository;
         this.collectedItemRepository = collectedItemRepository;
+        this.collectionSourceResultRepository = collectionSourceResultRepository;
         this.threadsCollector = threadsCollector;
         this.persistenceService = persistenceService;
+        this.evaluationService = evaluationService;
         this.properties = properties;
         this.sleeper = sleeper;
         this.clock = clock;
@@ -112,13 +133,15 @@ public class ManualThreadsCollectionService {
                     appliedMaxScrollCount,
                     run
             );
+            CollectionRun completedRun = persistAndEvaluate(run, results);
             return ManualThreadsCollectionResponse.from(
-                    persistenceService.persist(run, results),
+                    completedRun,
                     requestedMaxPostsPerAccount,
                     appliedMaxPostsPerAccount,
                     requestedMaxScrollCount,
                     appliedMaxScrollCount,
-                    safetyMessage(results)
+                    safetyMessage(results),
+                    sourceResults(completedRun)
             );
         } catch (RuntimeException exception) {
             CollectionRun failedRun = persistenceService.fail(run, exception.getMessage());
@@ -128,9 +151,14 @@ public class ManualThreadsCollectionService {
                     appliedMaxPostsPerAccount,
                     requestedMaxScrollCount,
                     appliedMaxScrollCount,
-                    exception.getMessage()
+                    exception.getMessage(),
+                    sourceResults(failedRun)
             );
         }
+    }
+
+    public synchronized ManualThreadsCollectionResponse collectEnabledSources() {
+        return collectRecentFromEnabledSources();
     }
 
     public synchronized ManualThreadsCollectionResponse collectRecentFromEnabledSources() {
@@ -158,13 +186,15 @@ public class ManualThreadsCollectionService {
                     LocalDateTime.now(clock).minusDays(RECENT_DAYS),
                     run
             );
+            CollectionRun completedRun = persistAndEvaluate(run, results);
             return ManualThreadsCollectionResponse.from(
-                    persistenceService.persist(run, results),
+                    completedRun,
                     properties.getDefaults().getMaxPostsPerAccount(),
                     properties.getDefaults().getMaxPostsPerAccount(),
                     properties.getDefaults().getMaxScrollCount(),
                     properties.getDefaults().getMaxScrollCount(),
-                    recentCollectionSafetyMessage(results, accountUrls.size())
+                    recentCollectionSafetyMessage(results, accountUrls.size()),
+                    sourceResults(completedRun)
             );
         } catch (RuntimeException exception) {
             CollectionRun failedRun = persistenceService.fail(run, exception.getMessage());
@@ -174,7 +204,8 @@ public class ManualThreadsCollectionService {
                     properties.getDefaults().getMaxPostsPerAccount(),
                     properties.getDefaults().getMaxScrollCount(),
                     properties.getDefaults().getMaxScrollCount(),
-                    exception.getMessage()
+                    exception.getMessage(),
+                    sourceResults(failedRun)
             );
         }
     }
@@ -221,7 +252,7 @@ public class ManualThreadsCollectionService {
             if (run != null) {
                 updateRunProgress(run, results);
             }
-            if (properties.getSafety().getStopOnStatuses().contains(result.status())) {
+            if (isGlobalFailure(result)) {
                 break;
             }
         }
@@ -408,19 +439,22 @@ public class ManualThreadsCollectionService {
                 .count();
 
         for (ThreadsCollectionResult result : results) {
-            if (properties.getSafety().getStopOnStatuses().contains(result.status())) {
-                return switch (result.status()) {
-                    case LOGIN_REQUIRED -> "Threads 로그인이 필요해 수집을 중단했습니다.";
-                    case ACCESS_RESTRICTED -> "접근 제한이 감지되어 수집을 중단했습니다.";
-                    case TIMEOUT -> "시간 초과로 수집을 중단했습니다.";
-                    default -> "수집 상태가 " + result.status() + " 이어서 중단했습니다.";
-                };
+            if (isGlobalFailure(result)) {
+                return "공용 Threads 세션을 사용할 수 없어 전체 수집을 중단했습니다.";
             }
         }
         if (cooldownSkippedCount > 0) {
             return "쿨다운 정책으로 %d개 소스를 건너뛰었습니다.".formatted(cooldownSkippedCount);
         }
-        return "안전 제한을 적용해 수집했습니다.";
+        long failedSourceCount = results.stream()
+                .filter(result -> result.status() != ThreadsCollectionStatus.SUCCESS)
+                .filter(result -> result.status() != ThreadsCollectionStatus.EMPTY_RESULT)
+                .filter(result -> result.status() != ThreadsCollectionStatus.COOLDOWN_SKIPPED)
+                .count();
+        if (failedSourceCount > 0) {
+            return "계정별 실패 %d건을 기록하고 나머지 소스 수집을 계속했습니다.".formatted(failedSourceCount);
+        }
+        return "활성 소스 수집을 완료했습니다.";
     }
 
     private String recentCollectionSafetyMessage(List<ThreadsCollectionResult> results, int sourceCount) {
@@ -444,5 +478,30 @@ public class ManualThreadsCollectionService {
     private boolean shouldUpdateLastCollectedAt(ThreadsCollectionResult result) {
         return result.status() == ThreadsCollectionStatus.SUCCESS
                 || result.status() == ThreadsCollectionStatus.EMPTY_RESULT;
+    }
+
+    private boolean isGlobalFailure(ThreadsCollectionResult result) {
+        if (result.status() == ThreadsCollectionStatus.LOGIN_REQUIRED) {
+            return true;
+        }
+        String warning = String.join(" ", result.warnings()).toLowerCase();
+        return warning.contains("profile is locked")
+                || warning.contains("프로필이 다른 chrome")
+                || warning.contains("프로필 잠금");
+    }
+
+    private CollectionRun persistAndEvaluate(
+            CollectionRun run,
+            List<ThreadsCollectionResult> results
+    ) {
+        CollectionRun completedRun = persistenceService.persist(run, results);
+        evaluationService.recalculateUnreviewedItems();
+        return completedRun;
+    }
+
+    private List<CollectionSourceResultResponse> sourceResults(CollectionRun run) {
+        return collectionSourceResultRepository.findByCollectionRunOrderBySourcePriorityAscIdAsc(run).stream()
+                .map(CollectionSourceResultResponse::from)
+                .toList();
     }
 }

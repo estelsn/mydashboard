@@ -59,17 +59,13 @@ class EvaluationApiTest {
         infoItemRepository.deleteAll();
         collectedItemRepository.deleteAll();
 
-        Source codexSource = sourceRepository.findAllByOrderByPriorityAscIdAsc().stream()
-                .filter(source -> source.getName().equals("Appcast"))
-                .findFirst()
-                .orElseThrow();
         Source newsSource = sourceRepository.findAllByOrderByPriorityAscIdAsc().stream()
                 .filter(source -> source.getName().equals("Choi OpenAI"))
                 .findFirst()
                 .orElseThrow();
 
         createInfoItem(
-                codexSource,
+                newsSource,
                 "Codex workflow setup",
                 "Codex workflow update shows a practical agent setup for code review and verification in a local project.",
                 DecisionStatus.UNREVIEWED

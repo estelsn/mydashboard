@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { deleteCollectionRun, fetchThreadsSessionStatus, openThreadsLoginBrowser } from './dashboardApi';
+import {
+  collectEnabledThreads,
+  deleteCollectionRun,
+  fetchThreadsSessionStatus,
+  openThreadsLoginBrowser,
+} from './dashboardApi';
 
 describe('dashboardApi', () => {
   afterEach(() => {
@@ -53,6 +58,25 @@ describe('dashboardApi', () => {
       headers: undefined,
       cache: undefined,
       method: 'DELETE',
+    });
+  });
+
+  it('collects all enabled Threads sources through the enabled endpoint', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: {
+        get: vi.fn().mockReturnValue('application/json'),
+      },
+      json: vi.fn().mockResolvedValue({ runId: 8 }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(collectEnabledThreads()).resolves.toEqual({ runId: 8 });
+    expect(fetchMock).toHaveBeenCalledWith('/api/collection-runs/threads/enabled', {
+      headers: undefined,
+      cache: undefined,
+      method: 'POST',
     });
   });
 });

@@ -97,8 +97,8 @@ export function collectThreads({ accountUrls, maxPostsPerAccount, maxScrollCount
   });
 }
 
-export function collectRecentThreads() {
-  return requestJson('/api/collection-runs/threads/recent', {
+export function collectEnabledThreads() {
+  return requestJson('/api/collection-runs/threads/enabled', {
     method: 'POST',
   });
 }

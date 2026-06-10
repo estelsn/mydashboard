@@ -15,8 +15,10 @@ import org.springframework.stereotype.Component;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
+import java.net.URI;
 import java.time.Duration;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 
 @Component
@@ -29,36 +31,56 @@ public class PlaywrightThreadsBrowserAutomation implements ThreadsBrowserAutomat
                     + "AppleWebKit/537.36 (KHTML, like Gecko) "
                     + "Chrome/148.0.0.0 Safari/537.36";
     private static final String EXTRACT_POSTS_SCRIPT = """
-            () => {
+            (expectedHandle) => {
               const normalize = value => (value || '').replace(/\\s+/g, ' ').trim();
               const postLinks = Array.from(document.querySelectorAll('a[href*="/post/"]'));
               const seen = new Set();
               const posts = [];
 
               for (const link of postLinks) {
-                const postUrl = new URL(link.href, location.origin).href.split('?')[0];
+                const parsedUrl = new URL(link.href, location.origin);
+                const postMatch = parsedUrl.pathname.match(/^\\/@([^/]+)\\/post\\/([^/]+)/i);
+                if (!postMatch) continue;
+
+                const authorHandle = postMatch[1];
+                if (expectedHandle && authorHandle.toLowerCase() !== expectedHandle.toLowerCase()) continue;
+
+                const postUrl = new URL(`/@${authorHandle}/post/${postMatch[2]}`, parsedUrl.origin).href;
                 if (seen.has(postUrl)) continue;
                 seen.add(postUrl);
 
-                const handleMatch = postUrl.match(/\\/@([^/]+)\\/post\\//);
-                const authorIdentifier = handleMatch ? '@' + handleMatch[1] : null;
+                const authorIdentifier = '@' + authorHandle;
                 let container = link;
                 let postContainer = null;
+                let fallbackContainer = null;
 
                 for (let depth = 0; depth < 12 && container; depth++, container = container.parentElement) {
                   const text = normalize(container.innerText);
                   const linkCount = container.querySelectorAll('a').length;
                   if (text.length >= 20 && text.length <= 6000 && linkCount >= 2) {
-                    postContainer = container;
-                    break;
+                    fallbackContainer ||= container;
+                    if (container.querySelector('time')) {
+                      postContainer = container;
+                      break;
+                    }
                   }
                 }
+                postContainer ||= fallbackContainer;
                 if (!postContainer) continue;
 
                 const timeElement = postContainer.querySelector('time');
+                const timestampLink = Array.from(postContainer.querySelectorAll('a[href*="/post/"]'))
+                  .find(candidate => {
+                    const candidateUrl = new URL(candidate.href, location.origin);
+                    const candidateMatch = candidateUrl.pathname.match(/^\\/@([^/]+)\\/post\\/([^/]+)/i);
+                    return candidateMatch
+                      && candidateMatch[1].toLowerCase() === authorHandle.toLowerCase()
+                      && candidateMatch[2] === postMatch[2]
+                      && normalize(candidate.innerText);
+                  });
                 const displayTime = timeElement
                   ? normalize(timeElement.getAttribute('datetime') || timeElement.innerText)
-                  : normalize(link.innerText);
+                  : normalize(timestampLink ? timestampLink.innerText : link.innerText);
                 const ignored = new Set([
                   normalize(authorIdentifier),
                   normalize(authorIdentifier && authorIdentifier.substring(1)),
@@ -204,7 +226,7 @@ public class PlaywrightThreadsBrowserAutomation implements ThreadsBrowserAutomat
         String structuredContent;
         try {
             content = page.content();
-            structuredContent = extractStructuredPosts(page);
+            structuredContent = extractStructuredPosts(page, request.url());
         } catch (RuntimeException exception) {
             log.warn("Threads browser failure: url={}, stage=dom-collection, message={}",
                     request.url(),
@@ -272,9 +294,22 @@ public class PlaywrightThreadsBrowserAutomation implements ThreadsBrowserAutomat
         return 0;
     }
 
-    private String extractStructuredPosts(Page page) {
-        Object result = page.evaluate(EXTRACT_POSTS_SCRIPT);
+    String extractStructuredPosts(Page page, String profileUrl) {
+        Object result = page.evaluate(EXTRACT_POSTS_SCRIPT, expectedAccountHandle(profileUrl));
         return result instanceof String value ? value : "[]";
+    }
+
+    static String expectedAccountHandle(String profileUrl) {
+        String path = URI.create(profileUrl).getPath();
+        if (path == null || path.length() < 3 || !path.startsWith("/@")) {
+            throw new IllegalArgumentException("Threads profile URL must contain an account handle");
+        }
+        int slash = path.indexOf('/', 2);
+        String handle = slash < 0 ? path.substring(2) : path.substring(2, slash);
+        if (handle.isBlank()) {
+            throw new IllegalArgumentException("Threads profile URL must contain an account handle");
+        }
+        return handle.toLowerCase(Locale.ROOT);
     }
 
     private int structuredPostCount(String structuredContent) {

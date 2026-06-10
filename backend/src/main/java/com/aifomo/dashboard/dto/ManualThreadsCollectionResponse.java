@@ -3,6 +3,8 @@ package com.aifomo.dashboard.dto;
 import com.aifomo.dashboard.domain.collection.CollectionRun;
 import com.aifomo.dashboard.domain.collection.CollectionRunStatus;
 
+import java.util.List;
+
 public record ManualThreadsCollectionResponse(
         Long runId,
         CollectionRunStatus status,
@@ -15,19 +17,17 @@ public record ManualThreadsCollectionResponse(
         int appliedMaxPostsPerAccount,
         int requestedMaxScrollCount,
         int appliedMaxScrollCount,
-        String safetyMessage
+        String safetyMessage,
+        List<CollectionSourceResultResponse> sourceResults
 ) {
-    public static ManualThreadsCollectionResponse from(CollectionRun run) {
-        return from(run, 0, 0, 0, 0, null);
-    }
-
     public static ManualThreadsCollectionResponse from(
             CollectionRun run,
             int requestedMaxPostsPerAccount,
             int appliedMaxPostsPerAccount,
             int requestedMaxScrollCount,
             int appliedMaxScrollCount,
-            String safetyMessage
+            String safetyMessage,
+            List<CollectionSourceResultResponse> sourceResults
     ) {
         return new ManualThreadsCollectionResponse(
                 run.getId(),
@@ -41,7 +41,8 @@ public record ManualThreadsCollectionResponse(
                 appliedMaxPostsPerAccount,
                 requestedMaxScrollCount,
                 appliedMaxScrollCount,
-                safetyMessage
+                safetyMessage,
+                sourceResults
         );
     }
 }

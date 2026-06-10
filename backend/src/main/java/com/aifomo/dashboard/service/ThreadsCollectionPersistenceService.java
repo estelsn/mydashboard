@@ -7,12 +7,14 @@ import com.aifomo.dashboard.domain.collected.CollectedItem;
 import com.aifomo.dashboard.domain.collected.CollectedItemStatus;
 import com.aifomo.dashboard.domain.collection.CollectionRun;
 import com.aifomo.dashboard.domain.collection.CollectionRunStatus;
+import com.aifomo.dashboard.domain.collection.CollectionSourceResult;
 import com.aifomo.dashboard.domain.info.DecisionStatus;
 import com.aifomo.dashboard.domain.info.ImportanceLevel;
 import com.aifomo.dashboard.domain.info.InfoItem;
 import com.aifomo.dashboard.domain.source.Source;
 import com.aifomo.dashboard.repository.CollectedItemRepository;
 import com.aifomo.dashboard.repository.CollectionRunRepository;
+import com.aifomo.dashboard.repository.CollectionSourceResultRepository;
 import com.aifomo.dashboard.repository.InfoItemRepository;
 import com.aifomo.dashboard.util.ContentHashUtil;
 import lombok.extern.slf4j.Slf4j;
@@ -48,17 +50,20 @@ public class ThreadsCollectionPersistenceService {
     private final CollectionRunRepository collectionRunRepository;
     private final CollectedItemRepository collectedItemRepository;
     private final InfoItemRepository infoItemRepository;
+    private final CollectionSourceResultRepository collectionSourceResultRepository;
     private final Clock clock;
 
     public ThreadsCollectionPersistenceService(
             CollectionRunRepository collectionRunRepository,
             CollectedItemRepository collectedItemRepository,
             InfoItemRepository infoItemRepository,
+            CollectionSourceResultRepository collectionSourceResultRepository,
             Clock clock
     ) {
         this.collectionRunRepository = collectionRunRepository;
         this.collectedItemRepository = collectedItemRepository;
         this.infoItemRepository = infoItemRepository;
+        this.collectionSourceResultRepository = collectionSourceResultRepository;
         this.clock = clock;
     }
 
@@ -66,9 +71,16 @@ public class ThreadsCollectionPersistenceService {
     public ThreadsCollectionPersistenceService(
             CollectionRunRepository collectionRunRepository,
             CollectedItemRepository collectedItemRepository,
-            InfoItemRepository infoItemRepository
+            InfoItemRepository infoItemRepository,
+            CollectionSourceResultRepository collectionSourceResultRepository
     ) {
-        this(collectionRunRepository, collectedItemRepository, infoItemRepository, Clock.systemDefaultZone());
+        this(
+                collectionRunRepository,
+                collectedItemRepository,
+                infoItemRepository,
+                collectionSourceResultRepository,
+                Clock.systemDefaultZone()
+        );
     }
 
     @Transactional
@@ -110,11 +122,13 @@ public class ThreadsCollectionPersistenceService {
                 String failureReason = statusMessage(result);
                 failures.add(failureReason);
                 messages.add(failureReason);
+                saveSourceResult(run, result, new PersistCounts(0, 0, result.posts().size(), List.of(failureReason)));
                 continue;
             }
 
             if (result.status() == ThreadsCollectionStatus.COOLDOWN_SKIPPED) {
                 cooldownSkippedCount++;
+                saveSourceResult(run, result, new PersistCounts(0, 0, 0, List.of()));
                 continue;
             }
 
@@ -136,16 +150,22 @@ public class ThreadsCollectionPersistenceService {
                 successfulSourceCount++;
             }
             messages.add(statusMessage(result, counts));
+            saveSourceResult(run, result, counts);
         }
 
         if (cooldownSkippedCount > 0) {
             messages.add("Threads 수집 건너뜀: 쿨다운 정책으로 %d개 소스를 건너뛰었습니다.".formatted(cooldownSkippedCount));
         }
 
-        boolean failed = failedSourceCount > 0 || failedCount > 0;
-        String failureReason = failed ? String.join("; ", failures) : null;
+        CollectionRunStatus finalStatus = finalStatus(
+                successfulSourceCount,
+                failedSourceCount,
+                createdCount,
+                failedCount
+        );
+        String failureReason = failures.isEmpty() ? null : String.join("; ", failures);
         run.complete(
-                failed ? CollectionRunStatus.FAILED : CollectionRunStatus.SUCCEEDED,
+                finalStatus,
                 successfulSourceCount,
                 failedSourceCount,
                 collectedItemCount,
@@ -165,6 +185,41 @@ public class ThreadsCollectionPersistenceService {
                 run.getFailedCount(),
                 run.getFailedSourceCount());
         return run;
+    }
+
+    private CollectionRunStatus finalStatus(
+            int successfulSourceCount,
+            int failedSourceCount,
+            int createdCount,
+            int failedCount
+    ) {
+        if (failedSourceCount == 0 && failedCount == 0) {
+            return CollectionRunStatus.SUCCEEDED;
+        }
+        if (successfulSourceCount > 0 || createdCount > 0) {
+            return CollectionRunStatus.PARTIAL_SUCCESS;
+        }
+        return CollectionRunStatus.FAILED;
+    }
+
+    private void saveSourceResult(
+            CollectionRun run,
+            ThreadsCollectionResult result,
+            PersistCounts counts
+    ) {
+        String message = result.warnings().isEmpty()
+                ? null
+                : String.join("; ", result.warnings());
+        collectionSourceResultRepository.save(new CollectionSourceResult(
+                run,
+                result.source(),
+                result.status(),
+                result.posts().size(),
+                counts.createdCount(),
+                counts.duplicateCount(),
+                counts.failedCount(),
+                message
+        ));
     }
 
     @Transactional

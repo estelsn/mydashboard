@@ -14,8 +14,10 @@ import java.time.Duration;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -53,6 +55,28 @@ class PlaywrightThreadsBrowserAutomationTest {
 
         assertThat(automation.performScrolling(page, 0, Duration.ofSeconds(45))).isZero();
         verifyNoInteractions(page);
+    }
+
+    @Test
+    void passesNormalizedRequestedAccountToStructuredExtraction() {
+        PlaywrightThreadsBrowserAutomation automation = automation();
+        Page page = mock(Page.class);
+        when(page.evaluate(anyString(), eq("choi.openai"))).thenReturn("[{\"postUrl\":\"canonical\"}]");
+
+        String result = automation.extractStructuredPosts(
+                page,
+                "https://www.threads.com/@Choi.OpenAI/"
+        );
+
+        assertThat(result).isEqualTo("[{\"postUrl\":\"canonical\"}]");
+        verify(page).evaluate(anyString(), eq("choi.openai"));
+    }
+
+    @Test
+    void extractsAccountHandleFromThreadsProfileUrl() {
+        assertThat(PlaywrightThreadsBrowserAutomation.expectedAccountHandle(
+                "https://www.threads.com/@Specal1849/"
+        )).isEqualTo("specal1849");
     }
 
     @Test
