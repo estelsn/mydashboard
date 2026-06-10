@@ -6,6 +6,9 @@
 # Local agent files
 .codex/
 
+# Local portfolio document
+/PORTFOLIO.md
+
 # Environment files
 .env
 .env.*
