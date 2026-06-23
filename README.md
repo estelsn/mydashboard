@@ -4,8 +4,6 @@ AI 관련 정보를 Threads 계정에서 수집하고, 중복 제거와 규칙 �
 
 현재 MVP의 주 수집 경로는 Threads입니다. 사용자가 직접 로그인한 Chrome 프로필을 Playwright가 재사용하며, 수집 결과는 로컬 H2 파일 DB에 저장됩니다.
 
-상세한 의사결정과 개발 과정은 [PORTFOLIO.md](./PORTFOLIO.md), 문제 해결 기록은 [TROUBLESHOOTING.md](./TROUBLESHOOTING.md)를 참고하십시오.
-
 ## 1. 프로젝트 소개
 
 AI 도구와 기술 정보는 여러 계정과 채널에 흩어져 있고, 같은 내용이 반복 노출됩니다. 이 프로젝트는 개인 개발자가 자주 확인하는 AI 정보를 로컬에서 수집하고, 중복과 우선순위를 정리해 검토 비용을 줄이는 것을 목표로 합니다.
@@ -226,8 +224,6 @@ Frontend 빌드는 `frontend/dist/`에 생성되며 Spring Boot 빌드에 자동
 ### 다중 출처 `PARTIAL_SUCCESS` 처리
 
 여러 출처 중 일부 계정만 실패해도 전체 실패처럼 보이는 문제가 있었습니다. `CollectionRun`과 `CollectionSourceResult`를 분리하고 `PARTIAL_SUCCESS` 상태를 도입해 출처별 성공, 실패, 생성, 중복, 실패 메시지를 확인할 수 있도록 했습니다.
-
-자세한 문제 원인과 검증 내용은 [TROUBLESHOOTING.md](./TROUBLESHOOTING.md)에 정리되어 있습니다.
 
 ## 10. 스크린샷
 
